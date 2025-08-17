@@ -1,0 +1,51 @@
+{
+  "name": "fast-grid-layout",
+  "version": "0.1.0",
+  "description": "Essential DOM utilities",
+  "keywords": [
+    "react",
+    "grid",
+    "layout",
+    "vanilla"
+  ],
+  "author": "Morris Brodersen <mb@morrisbrodersen.de>",
+  "license": "ISC",
+  "homepage": "https://github.com/morris/fast-grid-layout#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/morris/fast-grid-layout.git"
+  },
+  "bugs": {
+    "url": "https://github.com/morris/fast-grid-layout/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "dist/fast-grid-layout.js",
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "clean": "rm -rf coverage dist test-results",
+    "dev": "bash scripts/dev.sh",
+    "docs": "typedoc src/fast-grid-layout.ts --excludeProtected --excludePrivate",
+    "format": "prettier --write .",
+    "format-check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "bash scripts/test.sh",
+    "test-coverage": "bash scripts/test-coverage.sh",
+    "test-ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.1",
+    "@playwright/test": "^1.21.1",
+    "@types/node": "^20.14.9",
+    "c8": "^10.1.2",
+    "eslint": "^9.9.1",
+    "prettier": "^3.3.2",
+    "s4d": "^0.2.2",
+    "sass": "^1.90.0",
+    "terser": "^5.31.6",
+    "typescript": "^5.0.4",
+    "typescript-eslint": "^8.2.0"
+  }
+}

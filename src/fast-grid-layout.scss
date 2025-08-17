@@ -1,0 +1,46 @@
+:root {
+  --fast-grid-layout-outline: 3px solid rgba(30, 120, 255, 0.55);
+}
+
+.fast-grid-layout {
+  position: relative;
+  transition: height 0.18s ease-out;
+
+  > .item {
+    position: absolute;
+    transition:
+      width 0.18s ease,
+      height 0.18s ease,
+      transform 0.18s ease,
+      outline 0.1s ease-out;
+    cursor: pointer;
+
+    img {
+      user-select: none;
+    }
+
+    &.-selected {
+      outline: var(--fast-grid-layout-outline);
+      z-index: 1;
+    }
+  }
+
+  &.-moving,
+  &.-resizing {
+    > .item {
+      will-change: width, height, transform;
+    }
+
+    > .item.-selected {
+      opacity: 0.75;
+    }
+  }
+}
+
+._hide-selection *::selection {
+  all: inherit;
+}
+
+._cursor * {
+  cursor: var(--fast-grid-layout-cursor) !important;
+}

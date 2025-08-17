@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Fast Grid Layout</title>
+    <meta name="description" content="" />
+
+    <link rel="stylesheet" href="./css/fast-grid-layout.css" />
+    <link rel="stylesheet" href="./css/demo.css" />
+  </head>
+  <body>
+    <div class="demo-column">
+      <h1>Fast Grid Layout</h1>
+
+      <p>
+        <label>
+          Number of items
+          <select name="numberOfItems">
+            <option selected>10</option>
+            <option>50</option>
+            <option>100</option>
+            <option>500</option>
+            <option>1000</option>
+          </select>
+        </label>
+      </p>
+
+      <div class="demo-container">
+        <div class="fast-grid-layout"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { GridLayout } from './js/fast-grid-layout.js';
+      import { generateDemoLayout } from './js/demo.js';
+
+      const container = document.querySelector('.fast-grid-layout');
+      const config = {
+        columns: 12,
+        rowHeight: 40,
+        gap: 10,
+      };
+
+      const gridLayout = new GridLayout(container, config);
+
+      update();
+
+      document
+        .querySelector('[name=numberOfItems]')
+        .addEventListener('change', update);
+
+      function update() {
+        const numberOfItems = parseInt(
+          document.querySelector('[name=numberOfItems]').value,
+        );
+        const layout = generateDemoLayout(
+          parseInt(document.querySelector('[name=numberOfItems]').value),
+          config.columns,
+        );
+
+        for (let i = container.children.length; i < numberOfItems; ++i) {
+          const element = document.createElement('div');
+          element.className = `demo-item -style${(i % 16) + 1}`;
+          element.innerText = i + 101;
+          container.appendChild(element);
+        }
+
+        while (container.children.length > numberOfItems) {
+          container.removeChild(container.children[numberOfItems]);
+        }
+
+        gridLayout.setLayout(layout);
+        gridLayout.render();
+      }
+    </script>
+  </body>
+</html>

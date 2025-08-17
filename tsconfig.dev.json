@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "rootDir": "src",
+
+    "declaration": false,
+    "sourceMap": null,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+
+    "outDir": "docs/js",
+    "noEmit": false
+  }
+}

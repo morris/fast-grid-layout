@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Fast Grid Layout (React)</title>
+    <meta name="description" content="" />
+
+    <link rel="stylesheet" href="./css/fast-grid-layout.css" />
+    <link rel="stylesheet" href="./css/demo.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone/babel.min.js"></script>
+
+    <script type="module">
+      import * as FGL from './js/fast-grid-layout.js';
+      import { generateDemoLayout } from './js/demo.js';
+
+      window.FGL = FGL;
+      window.generateDemoLayout = generateDemoLayout;
+    </script>
+
+    <script type="text/babel">
+      function App() {
+        const [numberOfItems, setNumberOfItems] = React.useState(10);
+        const [config, setConfig] = React.useState({
+          columns: 12,
+          rowHeight: 40,
+          gap: 10,
+        });
+        const [layout, setLayout] = React.useState([]);
+
+        React.useEffect(() => {
+          setLayout(generateDemoLayout(numberOfItems, config.columns));
+        }, [numberOfItems]);
+
+        return (
+          <div className="demo-column">
+            <h1>Fast Grid Layout (React)</h1>
+
+            <p>
+              <label>
+                Number of items
+                <select
+                  name="numberOfItems"
+                  value={numberOfItems.toString()}
+                  onChange={(e) => setNumberOfItems(parseInt(e.target.value))}
+                >
+                  <option>10</option>
+                  <option>50</option>
+                  <option>100</option>
+                  <option>500</option>
+                  <option>1000</option>
+                </select>
+              </label>
+            </p>
+
+            <div className="demo-container">
+              <GridLayout
+                config={config}
+                layout={layout}
+                onLayoutChange={setLayout}
+              >
+                {layout.map((item, i) => (
+                  <div
+                    key={i}
+                    data-key={i}
+                    className={`demo-item -style${(i % 16) + 1}`}
+                  >
+                    {i + 101}
+                  </div>
+                ))}
+              </GridLayout>
+            </div>
+          </div>
+        );
+      }
+
+      function GridLayout({ config, layout, onLayoutChange, children }) {
+        const containerRef = React.useRef(null);
+        const controllerRef = React.useRef(null);
+
+        React.useEffect(() => {
+          if (!containerRef.current) return;
+
+          const controller = new FGL.GridLayout(containerRef.current, config);
+          controllerRef.current = controller;
+
+          return () => controller.disconnect();
+        }, []);
+
+        React.useEffect(() => {
+          const controller = controllerRef.current;
+
+          if (!controller) return;
+
+          controller.setConfig({ ...config, onLayoutChange });
+          controller.setLayout(layout);
+        }, [config, layout, onLayoutChange, children]);
+
+        return <div ref={containerRef}>{children}</div>;
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>

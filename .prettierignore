@@ -1,0 +1,6 @@
+/coverage
+/docs/css/fast-grid-layout.css
+/docs/js/fast-grid-layout.js
+/dist
+/node_modules
+/test-results
