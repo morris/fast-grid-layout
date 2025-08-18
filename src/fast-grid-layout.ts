@@ -53,16 +53,6 @@ export interface GridLayoutConfig {
   resizeThreshold?: number;
 
   /**
-   * Minimum pointer movement in pixels before a drag
-   * is recognized as intentional.
-   *
-   * Helps prevent accidental drags.
-   *
-   * @default 5
-   */
-  dragThreshold?: number;
-
-  /**
    * Callback triggered when the layout changes
    * (e.g. after drag/resize or external update).
    */
@@ -106,13 +96,14 @@ export class GridLayout {
   protected selection = new Set<string>();
   protected resizeHandle?: ResizeHandle;
 
-  protected dragging = false;
-  protected dragKey?: string;
+  protected dragPointerId = 0;
   protected dragStartTime = 0;
   protected dragStartX = 0;
   protected dragStartY = 0;
   protected dragEndX = 0;
   protected dragEndY = 0;
+  protected dragKey?: string;
+  protected dragging = false;
   protected dragX = 0;
   protected dragY = 0;
   protected preventClick = false;
@@ -123,12 +114,6 @@ export class GridLayout {
   protected layoutNeedsUpdate = true;
   protected selectionNeedsUpdate = true;
   protected dragNeedsUpdate = true;
-
-  protected _handleClick = this.handleClick.bind(this);
-  protected _handlePointerDown = this.handlePointerDown.bind(this);
-  protected _handlePointerMove = this.handlePointerMove.bind(this);
-  protected _handlePointerUp = this.handlePointerUp.bind(this);
-  protected _handleKeyUp = this.handleKeyUp.bind(this);
 
   protected fn = this.constructor as typeof GridLayout;
 
@@ -142,13 +127,7 @@ export class GridLayout {
     });
     this.resizeObserver.observe(this.container);
 
-    this.container.addEventListener('pointerdown', this._handlePointerDown);
-    window.addEventListener('pointermove', this._handlePointerMove, {
-      passive: true,
-    });
-    window.addEventListener('pointerup', this._handlePointerUp);
-    window.addEventListener('click', this._handleClick, true);
-    window.addEventListener('keyup', this._handleKeyUp);
+    this.addEventListeners();
   }
 
   setConfig(config: GridLayoutConfig) {
@@ -182,10 +161,14 @@ export class GridLayout {
     this.requestRender();
   }
 
-  toggleSelection(key: string) {
+  toggleSelection(key: string, exclusive = false) {
     if (this.selection.has(key)) {
       this.selection.delete(key);
     } else {
+      if (exclusive) {
+        this.selection.clear();
+      }
+
       this.selection.add(key);
     }
 
@@ -229,165 +212,207 @@ export class GridLayout {
 
     if (this.dragNeedsUpdate) {
       this.fn.renderDrag(this.container, this.dragging, this.resizeHandle);
+
+      if (this.dragging) {
+        const { dx, dy } = this.fn.calculateDrag(
+          this.container,
+          this.config,
+          this.dragStartX,
+          this.dragStartY,
+          this.dragEndX,
+          this.dragEndY,
+        );
+
+        if (dx !== this.dragX || dy !== this.dragY) {
+          this.dragX = dx;
+          this.dragY = dy;
+
+          this.temporaryItems = this.fn.dragItems(
+            this.layout,
+            this.config,
+            this.selection,
+            dx,
+            dy,
+            this.resizeHandle,
+          );
+
+          this.layoutNeedsUpdate = true;
+        }
+      }
+
       this.dragNeedsUpdate = false;
     }
   }
 
   //
 
-  protected handlePointerDown(e: PointerEvent) {
+  protected handleMouseDown(e: PointerEvent) {
     if (this.config.editable === false) return;
-    if (this.dragging) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
 
-    const element =
-      e.target instanceof Element
-        ? e.target.closest<HTMLElement>('.fast-grid-layout > .item')
-        : undefined;
-
-    if (!element) return;
-
-    this.resizeHandle = this.fn.checkResizeHandle(
-      element,
-      this.config,
-      e.clientX,
-      e.clientY,
-    );
-
-    this.dragKey = element.dataset.key;
     this.dragStartTime = Date.now();
-    this.dragEndX = this.dragStartX = e.clientX + window.scrollX;
-    this.dragEndY = this.dragStartY = e.clientY + window.scrollY;
-  }
+    this.dragStartX = this.dragEndX = e.pageX;
+    this.dragStartY = this.dragEndY = e.pageY;
 
-  protected handlePointerMove(e: PointerEvent) {
-    if (this.config.editable === false) return;
+    const element = this.getTargetElement(e);
 
-    this.requestRender();
-
-    this.dragEndX = e.clientX + window.scrollX;
-    this.dragEndY = e.clientY + window.scrollY;
-    this.dragNeedsUpdate = true;
-
-    if (this.dragging) {
-      const { dx, dy } = this.fn.calculateDrag(
-        this.container,
+    if (element) {
+      this.resizeHandle = this.fn.checkResizeHandle(
+        element,
         this.config,
-        this.dragStartX,
-        this.dragStartY,
-        this.dragEndX,
-        this.dragEndY,
+        e.clientX,
+        e.clientY,
       );
 
-      if (dx !== this.dragX || dy !== this.dragY) {
-        this.dragX = dx;
-        this.dragY = dy;
-
-        this.temporaryItems = this.fn.dragItems(
-          this.layout,
-          this.config,
-          this.selection,
-          dx,
-          dy,
-          this.resizeHandle,
-        );
-
-        this.layoutNeedsUpdate = true;
-      }
-
-      return;
+      this.dragKey = element.dataset.key;
     }
+  }
+
+  protected handleMouseMove(e: PointerEvent) {
+    if (this.config.editable === false) return;
+    if (e.pointerType !== 'mouse') return;
+
+    this.dragEndX = e.pageX;
+    this.dragEndY = e.pageY;
+    this.dragNeedsUpdate = true;
+    this.requestRender();
 
     if (!this.dragKey) {
-      const element =
-        e.target instanceof Element
-          ? e.target.closest<HTMLElement>('.fast-grid-layout > .item')
-          : undefined;
+      const element = this.getTargetElement(e);
 
       this.resizeHandle = element
         ? this.fn.checkResizeHandle(element, this.config, e.clientX, e.clientY)
         : undefined;
-
-      return;
     }
 
-    const deltaX = this.dragEndX - this.dragStartX;
-    const deltaY = this.dragEndY - this.dragStartY;
+    if (this.dragKey && !this.dragging) {
+      this.dragging = true;
 
-    const { dragThreshold = this.fn.DEFAULT_DRAG_THRESHOLD } = this.config;
-
-    if (abs(deltaX) < dragThreshold && abs(deltaY) < dragThreshold) {
-      return;
-    }
-
-    // Prevent unintentional dragging on touch devices.
-    if (e.pointerType === 'touch' && Date.now() - this.dragStartTime < 50) {
-      return this.cleanUpAfterDrag();
-    }
-
-    this.dragging = true;
-
-    if (!this.selection.has(this.dragKey) || this.resizeHandle) {
-      this.setSelection([this.dragKey]);
+      if (!this.selection.has(this.dragKey) || this.resizeHandle) {
+        this.setSelection([this.dragKey]);
+      }
     }
   }
 
-  protected handlePointerUp() {
+  protected handleMouseUp(e: PointerEvent) {
     if (this.config.editable === false) return;
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
 
-    if (this.dragging && this.temporaryItems) {
+    if (this.temporaryItems) {
       this.setLayout(this.temporaryItems);
       this.temporaryItems = undefined;
     }
 
-    this.cleanUpAfterDrag();
+    this.resetDrag();
+  }
+
+  protected handlePointerDown(e: PointerEvent) {
+    if (this.config.editable === false) return;
+    if (e.pointerType === 'mouse') return;
+    if (this.dragPointerId) return;
+
+    this.dragPointerId = e.pointerId;
+    this.dragStartTime = Date.now();
+    this.dragStartX = this.dragEndX = e.pageX;
+    this.dragStartY = this.dragEndY = e.pageY;
+
+    const element = this.getTargetElement(e);
+
+    if (element?.dataset.key && this.selection.has(element.dataset.key)) {
+      this.dragging = true;
+      this.resizeHandle = this.fn.checkResizeHandle(
+        element,
+        this.config,
+        e.clientX,
+        e.clientY,
+      );
+
+      this.requestRender();
+    }
+  }
+
+  protected handlePointerMove(e: PointerEvent) {
+    if (this.config.editable === false) return;
+    if (e.pointerType === 'mouse') return;
+    if (e.pointerId !== this.dragPointerId) return;
+
+    this.dragEndX = e.pageX;
+    this.dragEndY = e.pageY;
+    this.dragNeedsUpdate = true;
+
+    this.requestRender();
+  }
+
+  protected handlePointerUp(e: PointerEvent) {
+    if (this.config.editable === false) return;
+    if (e.pointerType === 'mouse') return;
+    if (e.pointerId !== this.dragPointerId) return;
+
+    if (
+      this.dragStartTime >= Date.now() - 250 &&
+      abs(this.dragEndX - this.dragStartX) < 10 &&
+      abs(this.dragEndY - this.dragStartY) < 10
+    ) {
+      const element = this.getTargetElement(e);
+
+      if (element?.dataset.key) {
+        this.toggleSelection(element.dataset.key, true);
+      } else {
+        this.clearSelection();
+      }
+    } else if (this.temporaryItems) {
+      this.setLayout(this.temporaryItems);
+      this.temporaryItems = undefined;
+    }
+
+    this.resetDrag();
   }
 
   protected handleClick(e: MouseEvent) {
-    if (this.config.editable === false) return;
-
     if (this.preventClick) {
       this.preventClick = false;
 
       e.preventDefault();
       e.stopImmediatePropagation();
+    } else {
+      if (!e.ctrlKey && !e.metaKey) {
+        this.clearSelection();
+      }
 
-      return;
-    }
+      const element = this.getTargetElement(e);
 
-    if (!e.ctrlKey && !e.metaKey) {
-      this.clearSelection();
-    }
-
-    const element =
-      e.target instanceof Element
-        ? e.target.closest<HTMLElement>('.fast-grid-layout > .item')
-        : undefined;
-
-    if (element?.dataset.key) {
-      this.toggleSelection(element.dataset.key);
+      if (element?.dataset.key) {
+        this.toggleSelection(element.dataset.key);
+      }
     }
   }
 
   protected handleKeyUp(e: KeyboardEvent) {
     if (this.config.editable === false) return;
 
-    if (e.key === 'Escape') {
-      this.cleanUpAfterDrag();
+    switch (e.key) {
+      case 'Escape':
+        this.resetDrag();
+        break;
     }
   }
 
-  protected cleanUpAfterDrag() {
+  protected resetDrag() {
     if (this.dragging) {
-      const selection = (document.defaultView || window).getSelection();
+      try {
+        const selection = (document.defaultView || window).getSelection();
 
-      if (selection && selection.type !== 'Caret') {
-        selection.removeAllRanges();
+        if (selection && selection.type !== 'Caret') {
+          selection.removeAllRanges();
+        }
+      } catch {
+        // ignore
       }
 
       this.preventClick = true;
     }
 
+    this.dragPointerId = 0;
     this.dragging = false;
     this.dragKey = undefined;
     this.resizeHandle = undefined;
@@ -397,17 +422,66 @@ export class GridLayout {
     this.requestRender();
   }
 
+  protected getTargetElement(e: Event) {
+    if (e.target instanceof Element) {
+      return e.target.closest<HTMLElement>('.fast-grid-layout > .item');
+    }
+  }
+
+  //
+
   disconnect() {
-    this.cleanUpAfterDrag();
+    this.resetDrag();
     this.fn.renderSelection(this.container, new Set());
     this.fn.renderDrag(this.container, false);
 
     this.resizeObserver.unobserve(this.container);
 
+    this.removeEventListeners();
+  }
+
+  protected _handleMouseDown = this.handleMouseDown.bind(this);
+  protected _handleMouseMove = this.handleMouseMove.bind(this);
+  protected _handleMouseUp = this.handleMouseUp.bind(this);
+
+  protected _handlePointerDown = this.handlePointerDown.bind(this);
+  protected _handlePointerMove = this.handlePointerMove.bind(this);
+  protected _handlePointerUp = this.handlePointerUp.bind(this);
+
+  protected _handleClick = this.handleClick.bind(this);
+  protected _handleKeyUp = this.handleKeyUp.bind(this);
+
+  protected addEventListeners() {
+    this.container.addEventListener('pointerdown', this._handleMouseDown);
+    window.addEventListener('pointermove', this._handleMouseMove, {
+      passive: true,
+    });
+    window.addEventListener('pointerup', this._handleMouseUp);
+    window.addEventListener('pointercancel', this._handleMouseUp);
+
+    this.container.addEventListener('pointerdown', this._handlePointerDown);
+    window.addEventListener('pointermove', this._handlePointerMove, {
+      passive: false,
+    });
+    window.addEventListener('pointerup', this._handlePointerUp);
+    window.addEventListener('pointercancel', this._handlePointerUp);
+
+    window.addEventListener('click', this._handleClick, { capture: true });
+    window.addEventListener('keyup', this._handleKeyUp);
+  }
+
+  protected removeEventListeners() {
+    this.container.removeEventListener('pointerdown', this._handleMouseDown);
+    window.removeEventListener('pointermove', this._handleMouseMove);
+    window.removeEventListener('pointerup', this._handleMouseUp);
+    window.removeEventListener('pointercancel', this._handleMouseUp);
+
     this.container.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointermove', this._handlePointerMove);
     window.removeEventListener('pointerup', this._handlePointerUp);
-    window.removeEventListener('click', this._handleClick, true);
+    window.removeEventListener('pointercancel', this._handlePointerUp);
+
+    window.removeEventListener('click', this._handleClick, { capture: true });
     window.removeEventListener('keyup', this._handleKeyUp);
   }
 
@@ -418,7 +492,6 @@ export class GridLayout {
   static DEFAULT_GAP = 0;
   static DEFAULT_RESIZE_HANDLES = new Set(['e', 'se', 's', 'sw', 'w']);
   static DEFAULT_RESIZE_THRESHOLD = 10;
-  static DEFAULT_DRAG_THRESHOLD = 5;
 
   static renderLayout(
     container: HTMLElement,

@@ -5,6 +5,8 @@
 .fast-grid-layout {
   position: relative;
   transition: height 0.18s ease-out;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
 .fast-grid-layout > .item {
   position: absolute;
@@ -17,6 +19,9 @@
 .fast-grid-layout > .item.-selected {
   outline: var(--fast-grid-layout-outline);
   z-index: 1;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
 }
 .fast-grid-layout.-moving > .item, .fast-grid-layout.-resizing > .item {
   will-change: width, height, transform;
