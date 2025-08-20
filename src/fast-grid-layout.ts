@@ -37,7 +37,7 @@ export interface GridLayoutConfig {
   rowGap?: number;
 
   /**
-   * Set of allowed resize handles for grid items.
+   * Set of allowed resize handles.
    * Possible values: `'n' | 'e' | 's' | 'w' | 'ne' | 'se' | 'sw' | 'nw'`.
    *
    * @default new Set(['e', 'se', 's', 'sw', 'w'])
@@ -91,7 +91,7 @@ export class GridLayout {
   protected container: HTMLElement;
   protected config: GridLayoutConfig;
   protected layout: GridLayoutItem[] = [];
-  protected temporaryItems?: GridLayoutItem[];
+  protected tempLayout?: GridLayoutItem[];
 
   protected selection = new Set<string>();
   protected resizeHandle?: ResizeHandle;
@@ -111,9 +111,9 @@ export class GridLayout {
   protected resizeObserver: ResizeObserver;
 
   protected renderRequested = false;
-  protected layoutNeedsUpdate = true;
-  protected selectionNeedsUpdate = true;
-  protected dragNeedsUpdate = true;
+  protected layoutFlag = true;
+  protected selectionFlag = true;
+  protected metaFlag = true;
 
   protected fn = this.constructor as typeof GridLayout;
 
@@ -122,7 +122,7 @@ export class GridLayout {
     this.config = config;
 
     this.resizeObserver = new ResizeObserver(() => {
-      this.layoutNeedsUpdate = true;
+      this.layoutFlag = true;
       this.requestRender();
     });
     this.resizeObserver.observe(this.container);
@@ -135,9 +135,9 @@ export class GridLayout {
 
     this.config = config;
     this.layout = this.fn.repairLayout(this.layout, this.config);
-    this.layoutNeedsUpdate = true;
-    this.selectionNeedsUpdate = true;
-    this.dragNeedsUpdate = true;
+    this.layoutFlag = true;
+    this.selectionFlag = true;
+    this.metaFlag = true;
     this.requestRender();
   }
 
@@ -147,7 +147,7 @@ export class GridLayout {
     this.layout = this.fn.repairLayout(layout, this.config);
     this.config.onLayoutChange?.(this.layout);
 
-    this.layoutNeedsUpdate = true;
+    this.layoutFlag = true;
     this.requestRender();
   }
 
@@ -157,7 +157,7 @@ export class GridLayout {
     this.selection = new Set(selection);
     this.config.onSelectionChange?.(this.selection);
 
-    this.selectionNeedsUpdate = true;
+    this.selectionFlag = true;
     this.requestRender();
   }
 
@@ -172,14 +172,14 @@ export class GridLayout {
       this.selection.add(key);
     }
 
-    this.selectionNeedsUpdate = true;
+    this.selectionFlag = true;
     this.requestRender();
   }
 
   clearSelection() {
     if (this.selection.size > 0) {
       this.selection.clear();
-      this.selectionNeedsUpdate = true;
+      this.selectionFlag = true;
       this.requestRender();
     }
   }
@@ -196,22 +196,22 @@ export class GridLayout {
   render() {
     this.renderRequested = false;
 
-    if (this.layoutNeedsUpdate) {
+    if (this.layoutFlag) {
       this.fn.renderLayout(
         this.container,
-        this.temporaryItems ?? this.layout,
+        this.tempLayout ?? this.layout,
         this.config,
       );
-      this.layoutNeedsUpdate = false;
+      this.layoutFlag = false;
     }
 
-    if (this.selectionNeedsUpdate) {
+    if (this.selectionFlag) {
       this.fn.renderSelection(this.container, this.selection);
-      this.selectionNeedsUpdate = false;
+      this.selectionFlag = false;
     }
 
-    if (this.dragNeedsUpdate) {
-      this.fn.renderDrag(this.container, this.dragging, this.resizeHandle);
+    if (this.metaFlag) {
+      this.fn.renderMeta(this.container, this.dragging, this.resizeHandle);
 
       if (this.dragging) {
         const { dx, dy } = this.fn.calculateDrag(
@@ -227,7 +227,7 @@ export class GridLayout {
           this.dragX = dx;
           this.dragY = dy;
 
-          this.temporaryItems = this.fn.dragItems(
+          this.tempLayout = this.fn.dragItems(
             this.layout,
             this.config,
             this.selection,
@@ -236,11 +236,11 @@ export class GridLayout {
             this.resizeHandle,
           );
 
-          this.layoutNeedsUpdate = true;
+          this.layoutFlag = true;
         }
       }
 
-      this.dragNeedsUpdate = false;
+      this.metaFlag = false;
     }
   }
 
@@ -274,7 +274,7 @@ export class GridLayout {
 
     this.dragEndX = e.pageX;
     this.dragEndY = e.pageY;
-    this.dragNeedsUpdate = true;
+    this.metaFlag = true;
     this.requestRender();
 
     if (!this.dragKey) {
@@ -298,9 +298,9 @@ export class GridLayout {
     if (this.config.editable === false) return;
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
 
-    if (this.temporaryItems) {
-      this.setLayout(this.temporaryItems);
-      this.temporaryItems = undefined;
+    if (this.tempLayout) {
+      this.setLayout(this.tempLayout);
+      this.tempLayout = undefined;
     }
 
     this.resetDrag();
@@ -338,7 +338,7 @@ export class GridLayout {
 
     this.dragEndX = e.pageX;
     this.dragEndY = e.pageY;
-    this.dragNeedsUpdate = true;
+    this.metaFlag = true;
 
     this.requestRender();
   }
@@ -353,6 +353,7 @@ export class GridLayout {
       abs(this.dragEndX - this.dragStartX) < 10 &&
       abs(this.dragEndY - this.dragStartY) < 10
     ) {
+      // It's a tap.
       const element = this.getTargetElement(e);
 
       if (element?.dataset.key) {
@@ -360,9 +361,9 @@ export class GridLayout {
       } else {
         this.clearSelection();
       }
-    } else if (this.temporaryItems) {
-      this.setLayout(this.temporaryItems);
-      this.temporaryItems = undefined;
+    } else if (this.tempLayout) {
+      this.setLayout(this.tempLayout);
+      this.tempLayout = undefined;
     }
 
     this.resetDrag();
@@ -392,6 +393,7 @@ export class GridLayout {
 
     switch (e.key) {
       case 'Escape':
+        this.clearSelection();
         this.resetDrag();
         break;
     }
@@ -418,7 +420,7 @@ export class GridLayout {
     this.resizeHandle = undefined;
     this.dragX = 0;
     this.dragY = 0;
-    this.dragNeedsUpdate = true;
+    this.metaFlag = true;
     this.requestRender();
   }
 
@@ -433,7 +435,7 @@ export class GridLayout {
   disconnect() {
     this.resetDrag();
     this.fn.renderSelection(this.container, new Set());
-    this.fn.renderDrag(this.container, false);
+    this.fn.renderMeta(this.container, false);
 
     this.resizeObserver.unobserve(this.container);
 
@@ -453,20 +455,16 @@ export class GridLayout {
 
   protected addEventListeners() {
     this.container.addEventListener('pointerdown', this._handleMouseDown);
-    window.addEventListener('pointermove', this._handleMouseMove, {
-      passive: true,
-    });
+    window.addEventListener('pointermove', this._handleMouseMove, PASSIVE);
     window.addEventListener('pointerup', this._handleMouseUp);
     window.addEventListener('pointercancel', this._handleMouseUp);
 
     this.container.addEventListener('pointerdown', this._handlePointerDown);
-    window.addEventListener('pointermove', this._handlePointerMove, {
-      passive: false,
-    });
+    window.addEventListener('pointermove', this._handlePointerMove, PASSIVE);
     window.addEventListener('pointerup', this._handlePointerUp);
     window.addEventListener('pointercancel', this._handlePointerUp);
 
-    window.addEventListener('click', this._handleClick, { capture: true });
+    window.addEventListener('click', this._handleClick, CAPTURE);
     window.addEventListener('keyup', this._handleKeyUp);
   }
 
@@ -481,7 +479,7 @@ export class GridLayout {
     window.removeEventListener('pointerup', this._handlePointerUp);
     window.removeEventListener('pointercancel', this._handlePointerUp);
 
-    window.removeEventListener('click', this._handleClick, { capture: true });
+    window.removeEventListener('click', this._handleClick, CAPTURE);
     window.removeEventListener('keyup', this._handleKeyUp);
   }
 
@@ -517,6 +515,8 @@ export class GridLayout {
 
     const containerWidth = container.offsetWidth;
     const columnWidth = (containerWidth - (columns - 1) * columnGap) / columns;
+    const columnWidthAndGap = columnWidth + columnGap;
+    const rowHeightAndGap = rowHeight + rowGap;
 
     let hMax = 0;
 
@@ -548,14 +548,13 @@ export class GridLayout {
         hMax = h;
       }
 
-      const width =
-        round(item.w * (columnWidth + columnGap) - columnGap) + 'px';
-      const height = round(item.h * (rowHeight + rowGap) - rowGap) + 'px';
+      const width = round(item.w * columnWidthAndGap - columnGap) + 'px';
+      const height = round(item.h * rowHeightAndGap - rowGap) + 'px';
       const transform =
         'translate(' +
-        round(item.x * (columnWidth + columnGap)) +
+        round(item.x * columnWidthAndGap) +
         'px, ' +
-        round(item.y * (rowHeight + rowGap)) +
+        round(item.y * rowHeightAndGap) +
         'px)';
 
       if (element.style.width !== width) {
@@ -571,7 +570,7 @@ export class GridLayout {
       }
     }
 
-    const containerHeight = round(hMax * (rowHeight + rowGap) - rowGap) + 'px';
+    const containerHeight = round(hMax * rowHeightAndGap - rowGap) + 'px';
 
     if (container.style.height !== containerHeight) {
       container.style.height = containerHeight;
@@ -582,16 +581,16 @@ export class GridLayout {
     for (let i = 0, l = container.children.length; i < l; ++i) {
       const element = container.children[i];
 
-      if (element instanceof HTMLElement && selection && element.dataset.key) {
+      if (element instanceof HTMLElement) {
         element.classList.toggle(
           '-selected',
-          selection.has(element.dataset.key),
+          selection.has(element.dataset.key as string),
         );
       }
     }
   }
 
-  static renderDrag(
+  static renderMeta(
     container: HTMLElement,
     dragging: boolean,
     resizeHandle?: ResizeHandle,
@@ -1006,3 +1005,6 @@ function clamp(value: number, min: number, max: number) {
 const abs = Math.abs;
 const min = Math.min;
 const round = Math.round;
+
+const CAPTURE = { capture: true };
+const PASSIVE = { passive: true };

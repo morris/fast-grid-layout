@@ -95,6 +95,7 @@ a {
   background-size: 128px;
   background-repeat: repeat;
   color: #fff;
+  image-rendering: pixelated;
 }
 
 .demo-item.-style11 {
