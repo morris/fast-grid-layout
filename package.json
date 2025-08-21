@@ -31,8 +31,8 @@
     "format": "prettier --write .",
     "format-check": "prettier --check .",
     "lint": "eslint .",
-    "test": "bash scripts/test.sh",
-    "test-coverage": "bash scripts/test-coverage.sh",
+    "test": "bash scripts/test.sh --project Chromium",
+    "test-coverage": "bash scripts/test-coverage.sh --project Chromium",
     "test-ui": "playwright test --ui"
   },
   "devDependencies": {

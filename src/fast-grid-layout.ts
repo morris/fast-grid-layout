@@ -725,7 +725,7 @@ export class GridLayout {
   }
 
   /**
-   * Moves the specified layout (in grid units).
+   * Moves the specified items (in grid units).
    * Returns a new layout if modified.
    */
   static moveItems(
@@ -763,7 +763,7 @@ export class GridLayout {
       return layout;
     }
 
-    return this.repairLayout(out, config, this.compareMidpoint);
+    return this.repairLayout(out, config, selection);
   }
 
   /**
@@ -842,7 +842,7 @@ export class GridLayout {
     const out = layout.slice(0);
     out[index] = { ...item, x, y, w, h };
 
-    return this.repairLayout(out, config);
+    return this.repairLayout(out, config, new Set([key]));
   }
 
   /**
@@ -852,8 +852,34 @@ export class GridLayout {
   static repairLayout(
     layout: GridLayoutItem[],
     config: GridLayoutConfig,
-    compare = this.compareTopLeft,
+    selection?: Set<string>,
   ) {
+    // Sort by row first, selection second (if any), column third.
+    const sortedItems = layout.slice(0).sort((a, b) => {
+      if (a.y < b.y) return -1;
+      if (a.y > b.y) return 1;
+
+      if (selection) {
+        if (selection.has(a.i)) {
+          if (!selection.has(b.i)) {
+            return -1;
+          }
+        } else if (selection.has(b.i)) {
+          return 1;
+        }
+      }
+
+      if (a.x < b.x) return -1;
+      if (a.x > b.x) return 1;
+
+      return 0;
+    });
+
+    const staticItems = sortedItems.filter((item) => item.static);
+    const numStatics = staticItems.length;
+    let modified = false;
+    let staticOffset = 0;
+
     const { columns = this.DEFAULT_COLUMNS } = config;
 
     // "Rising tide", i.e. number of blocked cells per column.
@@ -863,15 +889,9 @@ export class GridLayout {
       tide[x] = 0;
     }
 
-    const sortedItems = layout.slice(0).sort(compare);
-    const staticItems = sortedItems.filter((item) => item.static);
-    const numStatics = staticItems.length;
-    let modified = false;
-    let staticOffset = 0;
-
     for (let i = 0, l = sortedItems.length; i < l; i++) {
-      // Note that we allow layout to be out of bounds during sorting,
-      // which (for example) allows moving layout "before" the first item.
+      // Note that we allow items to be out of bounds during sorting,
+      // which (for example) allows moving items "before" the first item.
       // We fix any out of bound issues here.
       let item = this.repairItem(sortedItems[i], config);
       const x2 = item.x + item.w;
@@ -879,7 +899,7 @@ export class GridLayout {
       if (item.static) {
         // This static item will be part of the tide
         // and does not need to be considered for collision anymore.
-        // Since static layout will be visited in the same order
+        // Since static item will be visited in the same order
         // as the staticItems array, we can just increment the offset here.
         ++staticOffset;
       } else {
@@ -897,12 +917,12 @@ export class GridLayout {
         // Fix smallest gap/largest overlap.
         let yNext = item.y - minGap;
 
-        // Handle collision with static layout.
+        // Handle collision with static items.
         for (let j = staticOffset; j < numStatics; ++j) {
           const staticItem = staticItems[j];
 
           if (staticItem.y >= yNext + item.h) {
-            // Following static layout cannot collide because of sorting; stop.
+            // Following static items cannot collide because of sorting; stop.
             break;
           }
 
@@ -916,7 +936,7 @@ export class GridLayout {
             yNext = staticItem.y + staticItem.h;
 
             // Current item was moved;
-            // need to recheck collision with other static layout.
+            // need to recheck collision with other static items.
             j = staticOffset;
           }
         }
@@ -945,7 +965,7 @@ export class GridLayout {
   }
 
   /**
-   * Repair bounds of the given grid layout item to fit the given config.
+   * Repair bounds of the given item to fit the given config.
    * Returns a new item if there was anything to repair.
    */
   static repairItem(item: GridLayoutItem, config: GridLayoutConfig) {
@@ -963,36 +983,6 @@ export class GridLayout {
     }
 
     return { ...item, x, y, w, h };
-  }
-
-  /**
-   * Compare layout by midpoint (row-first).
-   */
-  static compareMidpoint(a: GridLayoutItem, b: GridLayoutItem) {
-    // Compare by midpoint
-    const au = a.x + a.w / 2;
-    const av = a.y + a.h / 2;
-    const bu = b.x + b.w / 2;
-    const bv = b.y + b.h / 2;
-
-    if (av < bv) return -1;
-    if (av > bv) return 1;
-    if (au < bu) return -1;
-    if (au > bu) return 1;
-
-    return 0;
-  }
-
-  /**
-   * Compare by top left corner (row-first).
-   */
-  static compareTopLeft(a: GridLayoutItem, b: GridLayoutItem) {
-    if (a.y < b.y) return -1;
-    if (a.y > b.y) return 1;
-    if (a.x < b.x) return -1;
-    if (a.x > b.x) return 1;
-
-    return 0;
   }
 }
 
