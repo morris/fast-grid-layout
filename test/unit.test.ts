@@ -11,7 +11,7 @@ test.describe('GridLayout.moveItems', () => {
     ];
 
     // when
-    const output = GridLayout.moveItems(input, {}, new Set(['0']), 2, 0);
+    const output = GridLayout.moveItems(input, 12, new Set(['0']), 2, 0);
 
     // then
     expect(output.sort((a, b) => (a.i < b.i ? -1 : a.i > b.i ? 1 : 0))).toEqual(
@@ -34,7 +34,7 @@ test.describe('GridLayout.resizeItems', () => {
     ];
 
     // when
-    const output = GridLayout.resizeItem(input, {}, '0', 'e', 2, 0);
+    const output = GridLayout.resizeItems(input, 12, new Set(['0']), 2, 0, 'e');
 
     // then
     expect(output.sort((a, b) => (a.i < b.i ? -1 : a.i > b.i ? 1 : 0))).toEqual(

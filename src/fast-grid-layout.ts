@@ -37,22 +37,6 @@ export interface GridLayoutConfig {
   rowGap?: number;
 
   /**
-   * Set of allowed resize handles.
-   * Possible values: `'n' | 'e' | 's' | 'w' | 'ne' | 'se' | 'sw' | 'nw'`.
-   *
-   * @default new Set(['e', 'se', 's', 'sw', 'w'])
-   */
-  resizeHandles?: Set<ResizeHandle>;
-
-  /**
-   * Pixel threshold for detecting a resize action
-   * when pointer is near an item's edge.
-   *
-   * @default 10
-   */
-  resizeThreshold?: number;
-
-  /**
    * Callback triggered when the layout changes
    * (e.g. after drag/resize or external update).
    */
@@ -90,6 +74,7 @@ export type ResizeHandle = 'n' | 'e' | 's' | 'w' | 'ne' | 'se' | 'sw' | 'nw';
 export class GridLayout {
   protected container: HTMLElement;
   protected config: GridLayoutConfig;
+  protected columns: number;
   protected layout: GridLayoutItem[] = [];
   protected tempLayout?: GridLayoutItem[];
 
@@ -120,6 +105,7 @@ export class GridLayout {
   constructor(container: HTMLElement, config: GridLayoutConfig) {
     this.container = container;
     this.config = config;
+    this.columns = config.columns ?? 12;
 
     this.resizeObserver = new ResizeObserver(() => {
       this.layoutFlag = true;
@@ -134,7 +120,8 @@ export class GridLayout {
     if (this.config === config) return;
 
     this.config = config;
-    this.layout = this.fn.repairLayout(this.layout, this.config);
+    this.columns = config.columns ?? 12;
+    this.layout = this.fn.repairLayout(this.layout, this.columns);
     this.layoutFlag = true;
     this.selectionFlag = true;
     this.metaFlag = true;
@@ -144,7 +131,7 @@ export class GridLayout {
   setLayout(layout: GridLayoutItem[]) {
     if (this.layout === layout) return;
 
-    this.layout = this.fn.repairLayout(layout, this.config);
+    this.layout = this.fn.repairLayout(layout, this.columns);
     this.config.onLayoutChange?.(this.layout);
 
     this.layoutFlag = true;
@@ -227,14 +214,24 @@ export class GridLayout {
           this.dragX = dx;
           this.dragY = dy;
 
-          this.tempLayout = this.fn.dragItems(
-            this.layout,
-            this.config,
-            this.selection,
-            dx,
-            dy,
-            this.resizeHandle,
-          );
+          if (this.resizeHandle) {
+            this.tempLayout = this.fn.resizeItems(
+              this.layout,
+              this.columns,
+              this.selection,
+              dx,
+              dy,
+              this.resizeHandle,
+            );
+          } else {
+            this.tempLayout = this.fn.moveItems(
+              this.layout,
+              this.columns,
+              this.selection,
+              dx,
+              dy,
+            );
+          }
 
           this.layoutFlag = true;
         }
@@ -254,16 +251,10 @@ export class GridLayout {
     this.dragStartX = this.dragEndX = e.pageX;
     this.dragStartY = this.dragEndY = e.pageY;
 
-    const element = this.getTargetElement(e);
+    const element = this.getTargetItem(e);
 
     if (element) {
-      this.resizeHandle = this.fn.checkResizeHandle(
-        element,
-        this.config,
-        e.clientX,
-        e.clientY,
-      );
-
+      this.resizeHandle = this.checkResizeHandle(element, e);
       this.dragKey = element.dataset.key;
     }
   }
@@ -278,10 +269,10 @@ export class GridLayout {
     this.requestRender();
 
     if (!this.dragKey) {
-      const element = this.getTargetElement(e);
+      const element = this.getTargetItem(e);
 
       this.resizeHandle = element
-        ? this.fn.checkResizeHandle(element, this.config, e.clientX, e.clientY)
+        ? this.checkResizeHandle(element, e)
         : undefined;
     }
 
@@ -316,16 +307,11 @@ export class GridLayout {
     this.dragStartX = this.dragEndX = e.pageX;
     this.dragStartY = this.dragEndY = e.pageY;
 
-    const element = this.getTargetElement(e);
+    const element = this.getTargetItem(e);
 
     if (element?.dataset.key && this.selection.has(element.dataset.key)) {
       this.dragging = true;
-      this.resizeHandle = this.fn.checkResizeHandle(
-        element,
-        this.config,
-        e.clientX,
-        e.clientY,
-      );
+      this.resizeHandle = this.checkResizeHandle(element, e);
 
       this.requestRender();
     }
@@ -349,12 +335,12 @@ export class GridLayout {
     if (e.pointerId !== this.dragPointerId) return;
 
     if (
-      this.dragStartTime >= Date.now() - 250 &&
-      abs(this.dragEndX - this.dragStartX) < 10 &&
-      abs(this.dragEndY - this.dragStartY) < 10
+      this.dragStartTime >= Date.now() - this.fn.TAP_DELAY &&
+      abs(this.dragEndX - this.dragStartX) < this.fn.TAP_THRESHOLD &&
+      abs(this.dragEndY - this.dragStartY) < this.fn.TAP_THRESHOLD
     ) {
       // It's a tap.
-      const element = this.getTargetElement(e);
+      const element = this.getTargetItem(e);
 
       if (element?.dataset.key) {
         this.toggleSelection(element.dataset.key, true);
@@ -380,7 +366,7 @@ export class GridLayout {
         this.clearSelection();
       }
 
-      const element = this.getTargetElement(e);
+      const element = this.getTargetItem(e);
 
       if (element?.dataset.key) {
         this.toggleSelection(element.dataset.key);
@@ -424,9 +410,29 @@ export class GridLayout {
     this.requestRender();
   }
 
-  protected getTargetElement(e: Event) {
+  protected getTargetItem(e: Event) {
     if (e.target instanceof Element) {
       return e.target.closest<HTMLElement>('.fast-grid-layout > .item');
+    }
+  }
+
+  checkResizeHandle(element: HTMLElement, event: PointerEvent) {
+    const handle = this.fn.checkResizeHandle(
+      element.getBoundingClientRect(),
+      event.clientX,
+      event.clientY,
+      10, // TODO make configurable?
+    );
+
+    switch (handle) {
+      case 'n':
+      case 'ne':
+      case 'nw':
+        // Disable north handles for now, as it feels unnatural.
+        // TODO make configurable?
+        return;
+      default:
+        return handle;
     }
   }
 
@@ -438,7 +444,6 @@ export class GridLayout {
     this.fn.renderMeta(this.container, false);
 
     this.resizeObserver.unobserve(this.container);
-
     this.removeEventListeners();
   }
 
@@ -488,8 +493,9 @@ export class GridLayout {
   static DEFAULT_COLUMNS = 12;
   static DEFAULT_ROW_HEIGHT = 30;
   static DEFAULT_GAP = 0;
-  static DEFAULT_RESIZE_HANDLES = new Set(['e', 'se', 's', 'sw', 'w']);
-  static DEFAULT_RESIZE_THRESHOLD = 10;
+
+  static TAP_DELAY = 250;
+  static TAP_THRESHOLD = 10;
 
   static renderLayout(
     container: HTMLElement,
@@ -578,15 +584,45 @@ export class GridLayout {
   }
 
   static renderSelection(container: HTMLElement, selection: Set<string>) {
+    const doc = container.ownerDocument;
+    const placeholders = doc.querySelectorAll<HTMLElement>(
+      '.fast-grid-layout-placeholder',
+    );
+
+    let placeholderIndex = 0;
+
     for (let i = 0, l = container.children.length; i < l; ++i) {
       const element = container.children[i];
 
       if (element instanceof HTMLElement) {
+        const selected = selection.has(element.dataset.key as string);
+
         element.classList.toggle(
           '-selected',
           selection.has(element.dataset.key as string),
         );
+
+        if (selected) {
+          let placeholder: HTMLElement;
+
+          if (placeholderIndex < placeholders.length) {
+            placeholder = placeholders[placeholderIndex];
+          } else {
+            placeholder = doc.createElement('div');
+            placeholder.classList.add('fast-grid-layout-placeholder');
+            doc.documentElement.appendChild(placeholder);
+          }
+
+          placeholder.style.width = element.offsetWidth + 'px';
+          placeholder.style.height = element.offsetHeight + 'px';
+          ++placeholderIndex;
+        }
       }
+    }
+
+    while (placeholderIndex < placeholders.length) {
+      placeholders[placeholderIndex].remove();
+      ++placeholderIndex;
     }
   }
 
@@ -601,12 +637,12 @@ export class GridLayout {
     const root = container.ownerDocument.documentElement;
 
     root.classList.toggle('_hide-selection', dragging);
-    root.classList.toggle('_cursor', !!resizeHandle);
+    root.classList.toggle('_force-cursor', !!resizeHandle);
 
     const cursor = this.getResizeCursor(resizeHandle);
 
-    if (root.style.getPropertyValue('--fast-grid-layout-cursor') !== cursor) {
-      root.style.setProperty('--fast-grid-layout-cursor', cursor);
+    if (root.style.getPropertyValue('--force-cursor') !== cursor) {
+      root.style.setProperty('--force-cursor', cursor);
     }
   }
 
@@ -635,50 +671,38 @@ export class GridLayout {
   }
 
   static checkResizeHandle(
-    element: Element,
-    config: GridLayoutConfig,
+    clientRect: DOMRect,
     clientX: number,
     clientY: number,
+    threshold: number,
   ): ResizeHandle | undefined {
-    const {
-      resizeHandles = this.DEFAULT_RESIZE_HANDLES,
-      resizeThreshold = this.DEFAULT_RESIZE_THRESHOLD,
-    } = config;
-
-    const rect = element.getBoundingClientRect();
-    const n = clientY - rect.top < resizeThreshold;
-    const e = rect.right - clientX < resizeThreshold;
-    const s = rect.bottom - clientY < resizeThreshold;
-    const w = clientX - rect.left < resizeThreshold;
-
-    let r: ResizeHandle | undefined;
+    const n = clientY - clientRect.top < threshold;
+    const e = clientRect.right - clientX < threshold;
+    const s = clientRect.bottom - clientY < threshold;
+    const w = clientX - clientRect.left < threshold;
 
     if (s) {
       if (e) {
-        r = 'se';
+        return 'se';
       } else if (w) {
-        r = 'sw';
+        return 'sw';
       } else {
-        r = 's';
+        return 's';
       }
     } else if (e) {
       if (n) {
-        r = 'ne';
+        return 'ne';
       } else {
-        r = 'e';
+        return 'e';
       }
     } else if (w) {
       if (n) {
-        r = 'nw';
+        return 'nw';
       } else {
-        r = 'w';
+        return 'w';
       }
     } else if (n) {
-      r = 'n';
-    }
-
-    if (r && resizeHandles.has(r)) {
-      return r;
+      return 'n';
     }
   }
 
@@ -702,35 +726,12 @@ export class GridLayout {
   }
 
   /**
-   * Move or resize specified item(s) (in grid units).
-   * Returns a new layout if modified.
-   */
-  static dragItems(
-    layout: GridLayoutItem[],
-    config: GridLayoutConfig,
-    selection: Set<string>,
-    dx: number,
-    dy: number,
-    resizeHandle?: ResizeHandle,
-  ) {
-    if (resizeHandle) {
-      for (const key of selection) {
-        return this.resizeItem(layout, config, key, resizeHandle, dx, dy);
-      }
-
-      return layout;
-    }
-
-    return this.moveItems(layout, config, selection, dx, dy);
-  }
-
-  /**
    * Moves the specified items (in grid units).
    * Returns a new layout if modified.
    */
   static moveItems(
     layout: GridLayoutItem[],
-    config: GridLayoutConfig,
+    columns: number,
     selection: Set<string>,
     dx: number,
     dy: number,
@@ -763,86 +764,86 @@ export class GridLayout {
       return layout;
     }
 
-    return this.repairLayout(out, config, selection);
+    return this.repairLayout(out, columns, selection);
   }
 
   /**
    * Resizes the specified item (in grid units).
    * Returns a new layout if modified.
    */
-  static resizeItem(
+  static resizeItems(
     layout: GridLayoutItem[],
-    config: GridLayoutConfig,
-    key: string,
-    handle: ResizeHandle,
+    columns: number,
+    selection: Set<string>,
     dx: number,
     dy: number,
+    handle: ResizeHandle,
   ) {
     if (dx === 0 && dy === 0) {
       return layout;
     }
 
-    const index = layout.findIndex((it) => it.i === key);
+    let out = layout;
 
-    if (index < 0) {
-      return layout;
+    for (let i = 0, l = layout.length; i < l; ++i) {
+      const item = layout[i];
+
+      if (selection.has(item.i)) {
+        const { maxW = columns, maxH = Infinity } = item;
+        let { x, y, w, h } = item;
+        const xw = x + w;
+        const yh = y + h;
+        const cx = columns - x;
+
+        switch (handle) {
+          case 'n':
+            h = clamp(h - dy, 1, maxH);
+            y = clamp(y + dy, 0, yh - 1);
+            break;
+          case 'e':
+            w = clamp(w + dx, 1, min(maxW, cx));
+            break;
+          case 's':
+            h = clamp(h + dy, 1, maxH);
+            break;
+          case 'w':
+            w = clamp(w - dx, 1, min(maxW, xw));
+            x = clamp(x + dx, 0, xw - 1);
+            break;
+          case 'ne':
+            w = clamp(w + dx, 1, min(maxW, cx));
+            h = clamp(h - dy, 1, maxH);
+            y = clamp(y + dy, 0, yh - 1);
+            break;
+          case 'se':
+            w = clamp(w + dx, 1, min(maxW, cx));
+            h = clamp(h + dy, 1, maxH);
+            break;
+          case 'sw':
+            w = clamp(w - dx, 1, min(maxW, xw));
+            h = clamp(h + dy, 1, maxH);
+            x = clamp(x + dx, 0, xw - 1);
+            break;
+          case 'nw':
+            w = clamp(w - dx, 1, min(maxW, xw));
+            h = clamp(h - dy, 1, maxH);
+            x = clamp(x + dx, 0, xw - 1);
+            y = clamp(y + dy, 0, yh - 1);
+            break;
+        }
+
+        if (item.x !== x || item.y !== y || item.w !== w || item.h !== h) {
+          if (out === layout) {
+            // Copy on write.
+            out = layout.slice(0);
+          }
+
+          out[i] = { ...item, x, y, w, h };
+        }
+      }
     }
 
-    const item = layout[index];
-
-    const { columns = this.DEFAULT_COLUMNS } = config;
-    const { maxW = columns, maxH = Infinity } = item;
-    let { x, y, w, h } = item;
-    const xw = x + w;
-    const yh = y + h;
-    const cx = columns - x;
-
-    switch (handle) {
-      case 'n':
-        h = clamp(h - dy, 1, maxH);
-        y = clamp(y + dy, 0, yh - 1);
-        break;
-      case 'e':
-        w = clamp(w + dx, 1, min(maxW, cx));
-        break;
-      case 's':
-        h = clamp(h + dy, 1, maxH);
-        break;
-      case 'w':
-        w = clamp(w - dx, 1, min(maxW, xw));
-        x = clamp(x + dx, 0, xw - 1);
-        break;
-      case 'ne':
-        w = clamp(w + dx, 1, min(maxW, cx));
-        h = clamp(h - dy, 1, maxH);
-        y = clamp(y + dy, 0, yh - 1);
-        break;
-      case 'se':
-        w = clamp(w + dx, 1, min(maxW, cx));
-        h = clamp(h + dy, 1, maxH);
-        break;
-      case 'sw':
-        w = clamp(w - dx, 1, min(maxW, xw));
-        h = clamp(h + dy, 1, maxH);
-        x = clamp(x + dx, 0, xw - 1);
-        break;
-      case 'nw':
-        w = clamp(w - dx, 1, min(maxW, xw));
-        h = clamp(h - dy, 1, maxH);
-        x = clamp(x + dx, 0, xw - 1);
-        y = clamp(y + dy, 0, yh - 1);
-        break;
-    }
-
-    if (item.x === x && item.y === y && item.w === w && item.h === h) {
-      return layout;
-    }
-
-    // Copy on write.
-    const out = layout.slice(0);
-    out[index] = { ...item, x, y, w, h };
-
-    return this.repairLayout(out, config, new Set([key]));
+    return this.repairLayout(out, columns, selection);
   }
 
   /**
@@ -851,7 +852,7 @@ export class GridLayout {
    */
   static repairLayout(
     layout: GridLayoutItem[],
-    config: GridLayoutConfig,
+    columns: number,
     selection?: Set<string>,
   ) {
     // Sort by row first, selection second (if any), column third.
@@ -880,8 +881,6 @@ export class GridLayout {
     let modified = false;
     let staticOffset = 0;
 
-    const { columns = this.DEFAULT_COLUMNS } = config;
-
     // "Rising tide", i.e. number of blocked cells per column.
     const tide: number[] = Array(columns);
 
@@ -893,7 +892,7 @@ export class GridLayout {
       // Note that we allow items to be out of bounds during sorting,
       // which (for example) allows moving items "before" the first item.
       // We fix any out of bound issues here.
-      let item = this.repairItem(sortedItems[i], config);
+      let item = this.repairItem(sortedItems[i], columns);
       const x2 = item.x + item.w;
 
       if (item.static) {
@@ -968,8 +967,7 @@ export class GridLayout {
    * Repair bounds of the given item to fit the given config.
    * Returns a new item if there was anything to repair.
    */
-  static repairItem(item: GridLayoutItem, config: GridLayoutConfig) {
-    const { columns = this.DEFAULT_COLUMNS } = config;
+  static repairItem(item: GridLayoutItem, columns: number) {
     const { minW = 1, maxW = columns, minH = 1, maxH = Infinity } = item;
     let { x, y, w, h } = item;
 

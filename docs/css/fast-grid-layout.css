@@ -30,10 +30,15 @@
   opacity: 0.75;
 }
 
+.fast-grid-layout-placeholder {
+  position: absolute;
+  background: rgba(30, 120, 255, 0.55);
+}
+
 ._hide-selection *::selection {
   all: inherit;
 }
 
-._cursor * {
-  cursor: var(--fast-grid-layout-cursor) !important;
+._force-cursor * {
+  cursor: var(--force-cursor) !important;
 }

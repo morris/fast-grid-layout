@@ -4,10 +4,12 @@ Fast editable grid layout system similar to
 [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
 Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 
-- Layouts are compatible with
+- Multi-item drag and drop
+- Resizing by dragging border
+- Robust, deterministic manipulation (less accidents)
+- Touch support (tap to select, then manipulate)
+- Data format compatible with
   [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
-- Multi-item drag & drop
-- Resizing
 
 ## Installation
 
@@ -55,7 +57,7 @@ Include, copy, and/or customize the [CSS](./dist/fast-grid-layout.css) |
     gap: 10,
   };
 
-  // Format compatible with React Grid Layout!
+  // Format compatible with React Grid Layout.
   const layout = [
     { x: 0, y: 0, w: 3, h: 3, i: 'a' },
     { x: 3, y: 0, w: 6, h: 3, i: 'b' },
@@ -111,7 +113,7 @@ function App() {
     gap: 10,
   };
 
-  // Format compatible with React Grid Layout!
+  // Format compatible with React Grid Layout.
   const layout = [
     { x: 0, y: 0, w: 3, h: 3, i: 'a' },
     { x: 3, y: 0, w: 6, h: 3, i: 'b' },
@@ -135,10 +137,67 @@ function App() {
 
 ## Configuration
 
-TODO
+```ts
+export interface GridLayoutConfig {
+  /**
+   * Number of columns in the grid.
+   *
+   * @default 12
+   */
+  columns?: number;
+
+  /**
+   * Height of each row in pixels.
+   *
+   * @default 30
+   */
+  rowHeight?: number;
+
+  /**
+   * Default gap between grid cells (applies to both rows and columns if no overrides are given).
+   *
+   * @default 0
+   */
+  gap?: number;
+
+  /**
+   * Horizontal gap between grid columns in pixels.
+   * Overrides `gap` if specified.
+   *
+   * @default gap
+   */
+  columnGap?: number;
+
+  /**
+   * Vertical gap between grid rows in pixels.
+   * Overrides `gap` if specified.
+   *
+   * @default gap
+   */
+  rowGap?: number;
+
+  /**
+   * Callback triggered when the layout changes
+   * (e.g. after drag/resize or external update).
+   */
+  onLayoutChange?: (layout: GridLayoutItem[]) => void;
+
+  /**
+   * Callback triggered when the selection changes
+   * (e.g. user clicks or toggles item selection).
+   */
+  onSelectionChange?: (selection: Set<string>) => void;
+
+  /**
+   * Is the layout editable?
+   *
+   * @default true
+   */
+  editable?: boolean;
+}
+```
 
 ## TODO
 
-- Docs
 - Placeholders
 - Responsive breakpoints

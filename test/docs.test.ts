@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import './coverage.js';
-import { useTestServer } from './useTestServer.js';
+import { useTestServer } from './test-util.js';
 
 test.describe('docs', () => {
   const getBaseURL = useTestServer(test);
