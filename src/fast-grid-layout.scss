@@ -37,14 +37,9 @@
     }
 
     > .item.-selected {
-      opacity: 0.75;
+      opacity: 0.67;
     }
   }
-}
-
-.fast-grid-layout-placeholder {
-  position: absolute;
-  background: rgba(30, 120, 255, 0.55);
 }
 
 ._hide-selection *::selection {

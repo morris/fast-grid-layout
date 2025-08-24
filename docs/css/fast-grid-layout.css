@@ -27,12 +27,7 @@
   will-change: width, height, transform;
 }
 .fast-grid-layout.-moving > .item.-selected, .fast-grid-layout.-resizing > .item.-selected {
-  opacity: 0.75;
-}
-
-.fast-grid-layout-placeholder {
-  position: absolute;
-  background: rgba(30, 120, 255, 0.55);
+  opacity: 0.67;
 }
 
 ._hide-selection *::selection {

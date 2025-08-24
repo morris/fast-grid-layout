@@ -5,7 +5,6 @@ Fast editable grid layout system similar to
 Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 
 - Multi-item drag and drop
-- Resizing by dragging border
 - Robust, deterministic manipulation (less accidents)
 - Touch support (tap to select, then manipulate)
 - Data format compatible with
@@ -199,5 +198,5 @@ export interface GridLayoutConfig {
 
 ## TODO
 
-- Placeholders
 - Responsive breakpoints
+- Placeholders?

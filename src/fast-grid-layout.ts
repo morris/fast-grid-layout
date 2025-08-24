@@ -510,19 +510,19 @@ export class GridLayout {
       rowHeight = this.DEFAULT_ROW_HEIGHT,
     } = config;
 
+    const containerWidth = container.offsetWidth;
+    const columnWidth = (containerWidth - (columns - 1) * columnGap) / columns;
+    const columnWidthAndGap = columnWidth + columnGap;
+    const rowHeightAndGap = rowHeight + rowGap;
+
+    container.classList.add('fast-grid-layout');
+
     const map = new Map<string, GridLayoutItem>();
 
     for (let i = 0, l = layout.length; i < l; ++i) {
       const item = layout[i];
       map.set(item.i, item);
     }
-
-    container.classList.add('fast-grid-layout');
-
-    const containerWidth = container.offsetWidth;
-    const columnWidth = (containerWidth - (columns - 1) * columnGap) / columns;
-    const columnWidthAndGap = columnWidth + columnGap;
-    const rowHeightAndGap = rowHeight + rowGap;
 
     let hMax = 0;
 
@@ -584,45 +584,15 @@ export class GridLayout {
   }
 
   static renderSelection(container: HTMLElement, selection: Set<string>) {
-    const doc = container.ownerDocument;
-    const placeholders = doc.querySelectorAll<HTMLElement>(
-      '.fast-grid-layout-placeholder',
-    );
-
-    let placeholderIndex = 0;
-
     for (let i = 0, l = container.children.length; i < l; ++i) {
       const element = container.children[i];
 
       if (element instanceof HTMLElement) {
-        const selected = selection.has(element.dataset.key as string);
-
         element.classList.toggle(
           '-selected',
           selection.has(element.dataset.key as string),
         );
-
-        if (selected) {
-          let placeholder: HTMLElement;
-
-          if (placeholderIndex < placeholders.length) {
-            placeholder = placeholders[placeholderIndex];
-          } else {
-            placeholder = doc.createElement('div');
-            placeholder.classList.add('fast-grid-layout-placeholder');
-            doc.documentElement.appendChild(placeholder);
-          }
-
-          placeholder.style.width = element.offsetWidth + 'px';
-          placeholder.style.height = element.offsetHeight + 'px';
-          ++placeholderIndex;
-        }
       }
-    }
-
-    while (placeholderIndex < placeholders.length) {
-      placeholders[placeholderIndex].remove();
-      ++placeholderIndex;
     }
   }
 
