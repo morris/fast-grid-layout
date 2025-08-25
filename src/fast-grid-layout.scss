@@ -17,16 +17,21 @@
       outline 0.1s ease-out;
     cursor: pointer;
 
-    img {
-      user-select: none;
-    }
-
     &.-selected {
       outline: var(--fast-grid-layout-outline);
       z-index: 1;
       -webkit-user-select: none;
       user-select: none;
       touch-action: none;
+    }
+
+    img {
+      user-select: none;
+    }
+
+    .content {
+      cursor: auto;
+      overflow: hidden;
     }
   }
 

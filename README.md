@@ -10,6 +10,9 @@ Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 - Data format compatible with
   [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
 
+Try the **[Demo (Vanilla)](https://morris.github.io/fast-grid-layout/) |
+[Demo (React)](https://morris.github.io/fast-grid-layout/react.html)**
+
 ## Installation
 
 With npm:
@@ -196,7 +199,13 @@ export interface GridLayoutConfig {
 }
 ```
 
+## Notes
+
+Set the `content` class on content elements inside items. This disables item
+selection and dragging when clicking/tapping these elements, but enables text
+selection and other regular manipulation.
+
 ## TODO
 
+- Test more browser/OS combinations
 - Responsive breakpoints
-- Placeholders?

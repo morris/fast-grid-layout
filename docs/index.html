@@ -63,7 +63,12 @@
         for (let i = container.children.length; i < numberOfItems; ++i) {
           const element = document.createElement('div');
           element.className = `demo-item -style${(i % 16) + 1}`;
-          element.innerText = i + 101;
+          element.innerHTML = `<h2>${i + 101}</h2>`;
+
+          if (i % 5 === 3) {
+            element.innerHTML += '<div class="content">Example content</div>';
+          }
+
           container.appendChild(element);
         }
 

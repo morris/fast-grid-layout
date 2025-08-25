@@ -89,9 +89,10 @@ export class GridLayout {
   protected dragEndY = 0;
   protected dragKey?: string;
   protected dragging = false;
-  protected dragX = 0;
-  protected dragY = 0;
   protected preventClick = false;
+
+  protected lastDeltaX = 0;
+  protected lastDeltaY = 0;
 
   protected resizeObserver: ResizeObserver;
 
@@ -210,9 +211,9 @@ export class GridLayout {
           this.dragEndY,
         );
 
-        if (dx !== this.dragX || dy !== this.dragY) {
-          this.dragX = dx;
-          this.dragY = dy;
+        if (dx !== this.lastDeltaX || dy !== this.lastDeltaY) {
+          this.lastDeltaX = dx;
+          this.lastDeltaY = dy;
 
           if (this.resizeHandle) {
             this.tempLayout = this.fn.resizeItems(
@@ -276,7 +277,12 @@ export class GridLayout {
         : undefined;
     }
 
-    if (this.dragKey && !this.dragging) {
+    if (
+      !this.dragging &&
+      this.dragKey &&
+      (abs(this.dragEndX - this.dragStartX) > this.fn.DRAG_THRESHOLD ||
+        abs(this.dragEndY - this.dragStartY) > this.fn.DRAG_THRESHOLD)
+    ) {
       this.dragging = true;
 
       if (!this.selection.has(this.dragKey) || this.resizeHandle) {
@@ -335,7 +341,7 @@ export class GridLayout {
     if (e.pointerId !== this.dragPointerId) return;
 
     if (
-      this.dragStartTime >= Date.now() - this.fn.TAP_DELAY &&
+      this.dragStartTime > Date.now() - this.fn.TAP_DELAY &&
       abs(this.dragEndX - this.dragStartX) < this.fn.TAP_THRESHOLD &&
       abs(this.dragEndY - this.dragStartY) < this.fn.TAP_THRESHOLD
     ) {
@@ -379,6 +385,8 @@ export class GridLayout {
 
     switch (e.key) {
       case 'Escape':
+        this.tempLayout = undefined;
+        this.layoutFlag = true;
         this.clearSelection();
         this.resetDrag();
         break;
@@ -404,15 +412,21 @@ export class GridLayout {
     this.dragging = false;
     this.dragKey = undefined;
     this.resizeHandle = undefined;
-    this.dragX = 0;
-    this.dragY = 0;
+    this.lastDeltaX = 0;
+    this.lastDeltaY = 0;
     this.metaFlag = true;
     this.requestRender();
   }
 
   protected getTargetItem(e: Event) {
     if (e.target instanceof Element) {
-      return e.target.closest<HTMLElement>('.fast-grid-layout > .item');
+      const item = e.target.closest<HTMLElement>('.fast-grid-layout > .item');
+      if (
+        item?.classList.contains('-selected') ||
+        !e.target.closest<HTMLElement>('.fast-grid-layout .content')
+      ) {
+        return item;
+      }
     }
   }
 
@@ -421,7 +435,7 @@ export class GridLayout {
       element.getBoundingClientRect(),
       event.clientX,
       event.clientY,
-      10, // TODO make configurable?
+      this.fn.RESIZE_THRESHOLD,
     );
 
     switch (handle) {
@@ -494,8 +508,10 @@ export class GridLayout {
   static DEFAULT_ROW_HEIGHT = 30;
   static DEFAULT_GAP = 0;
 
+  static RESIZE_THRESHOLD = 10;
   static TAP_DELAY = 250;
   static TAP_THRESHOLD = 10;
+  static DRAG_THRESHOLD = 7;
 
   static renderLayout(
     container: HTMLElement,
