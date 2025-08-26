@@ -12,13 +12,13 @@ export function generateDemoLayout(numberOfItems, columns) {
     );
     const h = Math.floor((Math.random() * columns) / 2) + 3;
 
-    layout.push({ x, y, w, h, i: i.toString() });
+    layout.push({ x, y, w, h, i: i.toString(), static: i % 7 === 6 });
 
     x = x + w;
 
     if (x >= columns) {
       x = 0;
-      r = r + 1;
+      r = r + columns;
     }
   }
 

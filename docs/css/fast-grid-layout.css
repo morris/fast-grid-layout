@@ -11,6 +11,8 @@
 .fast-grid-layout > .item {
   position: absolute;
   transition: width 0.18s ease, height 0.18s ease, transform 0.18s ease, outline 0.1s ease-out;
+}
+.fast-grid-layout > .item.-dynamic {
   cursor: pointer;
 }
 .fast-grid-layout > .item.-selected {
@@ -25,7 +27,6 @@
 }
 .fast-grid-layout > .item .content {
   cursor: auto;
-  overflow: hidden;
 }
 .fast-grid-layout.-moving > .item, .fast-grid-layout.-resizing > .item {
   will-change: width, height, transform;

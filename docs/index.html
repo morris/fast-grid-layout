@@ -35,49 +35,75 @@
     <script type="module">
       import { GridLayout } from './js/fast-grid-layout.js';
       import { generateDemoLayout } from './js/demo.js';
+      import { reconcile } from 'https://cdn.jsdelivr.net/npm/exdom@2/dist/exdom.min.js';
 
       const container = document.querySelector('.fast-grid-layout');
-      const config = {
-        columns: 12,
+      const columns = 12;
+
+      let layout = [];
+
+      const gridLayout = new GridLayout(container, {
+        columns,
         rowHeight: 40,
         gap: 10,
-      };
+        onLayoutChange(l) {
+          layout = l;
+        },
+      });
 
-      const gridLayout = new GridLayout(container, config);
-
-      update();
+      regenerate();
 
       document
         .querySelector('[name=numberOfItems]')
-        .addEventListener('change', update);
+        .addEventListener('change', regenerate);
 
-      function update() {
+      document.addEventListener('click', (e) => {
+        if (e.target.matches('.delete')) {
+          delete_(e.target.parentNode.dataset.key);
+        }
+      });
+
+      function delete_(key) {
+        layout = layout.filter((item) => item.i !== key);
+
+        update();
+      }
+
+      function regenerate() {
         const numberOfItems = parseInt(
           document.querySelector('[name=numberOfItems]').value,
         );
-        const layout = generateDemoLayout(
-          parseInt(document.querySelector('[name=numberOfItems]').value),
-          config.columns,
-        );
 
-        for (let i = container.children.length; i < numberOfItems; ++i) {
-          const element = document.createElement('div');
-          element.className = `demo-item -style${(i % 16) + 1}`;
-          element.innerHTML = `<h2>${i + 101}</h2>`;
+        layout = generateDemoLayout(numberOfItems, columns);
 
-          if (i % 5 === 3) {
-            element.innerHTML += '<div class="content">Example content</div>';
-          }
+        update();
+      }
 
-          container.appendChild(element);
-        }
+      function update() {
+        reconcile({
+          container,
+          items: layout,
+          key: (item) => item.i,
+          create(item) {
+            const i = parseInt(item.i);
+            const element = document.createElement('div');
+            element.dataset.key = item.i;
+            element.className = `demo-item -style${(i % 16) + 1}`;
+            element.innerHTML = `<h2>${i + 101}</h2><button class="delete">&times;</button>`;
 
-        while (container.children.length > numberOfItems) {
-          container.removeChild(container.children[numberOfItems]);
-        }
+            if (i % 5 === 3) {
+              element.innerHTML += '<p class="content">Example content</p>';
+            }
+
+            if (item.static) {
+              element.innerHTML += '<p class="content">(Static item)</p>';
+            }
+
+            return element;
+          },
+        });
 
         gridLayout.setLayout(layout);
-        gridLayout.render();
       }
     </script>
   </body>

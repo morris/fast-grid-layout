@@ -252,7 +252,7 @@ export class GridLayout {
     this.dragStartX = this.dragEndX = e.pageX;
     this.dragStartY = this.dragEndY = e.pageY;
 
-    const element = this.getTargetItem(e);
+    const element = this.getTargetElement(e);
 
     if (element) {
       this.resizeHandle = this.checkResizeHandle(element, e);
@@ -270,7 +270,7 @@ export class GridLayout {
     this.requestRender();
 
     if (!this.dragKey) {
-      const element = this.getTargetItem(e);
+      const element = this.getTargetElement(e);
 
       this.resizeHandle = element
         ? this.checkResizeHandle(element, e)
@@ -313,7 +313,7 @@ export class GridLayout {
     this.dragStartX = this.dragEndX = e.pageX;
     this.dragStartY = this.dragEndY = e.pageY;
 
-    const element = this.getTargetItem(e);
+    const element = this.getTargetElement(e);
 
     if (element?.dataset.key && this.selection.has(element.dataset.key)) {
       this.dragging = true;
@@ -346,7 +346,7 @@ export class GridLayout {
       abs(this.dragEndY - this.dragStartY) < this.fn.TAP_THRESHOLD
     ) {
       // It's a tap.
-      const element = this.getTargetItem(e);
+      const element = this.getTargetElement(e);
 
       if (element?.dataset.key) {
         this.toggleSelection(element.dataset.key, true);
@@ -372,7 +372,7 @@ export class GridLayout {
         this.clearSelection();
       }
 
-      const element = this.getTargetItem(e);
+      const element = this.getTargetElement(e);
 
       if (element?.dataset.key) {
         this.toggleSelection(element.dataset.key);
@@ -418,14 +418,19 @@ export class GridLayout {
     this.requestRender();
   }
 
-  protected getTargetItem(e: Event) {
+  protected getTargetElement(e: Event) {
     if (e.target instanceof Element) {
       const item = e.target.closest<HTMLElement>('.fast-grid-layout > .item');
-      if (
-        item?.classList.contains('-selected') ||
-        !e.target.closest<HTMLElement>('.fast-grid-layout .content')
-      ) {
-        return item;
+
+      if (item) {
+        if (item.classList.contains('-static')) return;
+        if (item.classList.contains('-selected')) return item;
+
+        const content = e.target.closest<HTMLElement>(
+          '.fast-grid-layout .content, button, input, textarea, select',
+        );
+
+        if (!content) return item;
       }
     }
   }
@@ -563,6 +568,8 @@ export class GridLayout {
       }
 
       element.classList.add('item');
+      element.classList.toggle('-dynamic', !item.static);
+      element.classList.toggle('-static', !!item.static);
 
       const h = item.y + item.h;
 

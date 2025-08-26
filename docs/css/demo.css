@@ -63,8 +63,23 @@ a {
   margin-top: 0;
 }
 
+.demo-item button.delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  font-size: inherit;
+}
+
 .demo-item .content {
   text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .demo-item.-style1 {
@@ -118,4 +133,8 @@ a {
 .demo-item.-style14 {
   background-color: #ff4800;
   color: #000;
+}
+
+.demo-item.-static {
+  filter: sepia(80%);
 }
