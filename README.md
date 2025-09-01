@@ -11,7 +11,8 @@ Performant even at **hundreds of items**. Vanilla/framework-agnostic.
   [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
 
 Try the **[Demo (Vanilla)](https://morris.github.io/fast-grid-layout/) |
-[Demo (React)](https://morris.github.io/fast-grid-layout/react.html)**
+[Demo (with Breakpoints)](https://morris.github.io/fast-grid-layout/react.html)
+| [Demo (React)](https://morris.github.io/fast-grid-layout/react.html)**
 
 ## Installation
 
@@ -68,6 +69,7 @@ Include, copy, and/or customize the [CSS](./dist/fast-grid-layout.css) |
 
   const gridLayout = new GridLayout(container, config);
   gridLayout.setLayout(layout);
+  gridLayout.setEditable(true);
 </script>
 ```
 
@@ -79,7 +81,7 @@ You'll need a thin wrapper component, for example:
 import { useEffect, useRef } from 'react';
 import { GridLayout as GridLayoutController } from 'fast-grid-layout';
 
-function GridLayout({ config, layout, onLayoutChange, children }) {
+function GridLayout({ config, layout, editable, onLayoutChange, children }) {
   const containerRef = useRef(null);
   const controllerRef = useRef(null);
 
@@ -97,9 +99,11 @@ function GridLayout({ config, layout, onLayoutChange, children }) {
 
     if (!controller) return;
 
-    controller.setConfig({ ...config, onLayoutChange });
+    controller.setConfig(config);
+    controller.setEditable(editable);
     controller.setLayout(layout);
-  }, [config, layout, onLayoutChange, children]);
+    controller.onLayoutChange(onLayoutChange);
+  }, [config, editable, layout, onLayoutChange, children]);
 
   return <div ref={containerRef}>{children}</div>;
 }
@@ -125,7 +129,7 @@ function App() {
   return (
     <div>
       <h1>Fast Grid Layout (React)</h1>
-      <GridLayout config={config} layout={layout}>
+      <GridLayout config={config} layout={layout} editable>
         {layout.map((item) => (
           <div key={item.i} data-key={item.i}>
             {item.i.toUpperCase()}
@@ -139,97 +143,46 @@ function App() {
 
 ## Configuration
 
-```ts
-export interface GridLayoutConfig {
-  /**
-   * Number of columns in the grid.
-   *
-   * @default 12
-   */
-  columns?: number;
+```js
+const gridLayout = new GridLayout(container, {
+  columns: 12 // Number of columns in the grid (default: 12).
+  rowHeight: 30, // Height of each row in pixels (default: 30).
+  gap: 0, // Gap between grid cells (applies to both rows and columns, default: 0).
+  columnGap: 0, // Horizontal gap between grid columns in pixels (default: gap).
+  rowGap: 0, // Vertical gap between grid rows in pixels (default: gap).
+  breakpoints: { // Named breakpoint configurations.
+    sm: { maxWidth: 640, columns: 4 }, // May override columns, rowHeight, gaps.
+    md: { maxWidth: 1024, columns: 8, },
+    // Larges breakpoint "default" is always implicitly defined (maxWidth: Infinity).
+  }
+});
 
-  /**
-   * Height of each row in pixels.
-   *
-   * @default 30
-   */
-  rowHeight?: number;
+// Set config dynamically.
+gridLayout.setConfig({ /* See above. */ });
 
-  /**
-   * Default gap between grid cells (applies to both rows and columns if no overrides are given).
-   *
-   * @default 0
-   */
-  gap?: number;
+// Toggle editing (default: off)
+gridLayout.setEditable(true);
 
-  /**
-   * Horizontal gap between grid columns in pixels.
-   * Overrides `gap` if specified.
-   *
-   * @default gap
-   */
-  columnGap?: number;
+// Set layout change callback (there can only be one).
+gridLayout.onLayoutChange((layout, breakpoint) => {
+  // Handle layout change.
+  // Second argument is the breakpoint name for which the layout was changed.
+});
 
-  /**
-   * Vertical gap between grid rows in pixels.
-   * Overrides `gap` if specified.
-   *
-   * @default gap
-   */
-  rowGap?: number;
-
-  /**
-   * Callback triggered when the layout changes
-   * (e.g. after drag/resize or external update).
-   */
-  onLayoutChange?: (layout: GridLayoutItem[]) => void;
-
-  /**
-   * Callback triggered when the selection changes
-   * (e.g. user clicks or toggles item selection).
-   */
-  onSelectionChange?: (selection: Set<string>) => void;
-
-  /**
-   * Is the layout editable?
-   *
-   * @default true
-   */
-  editable?: boolean;
-
-  /**
-   * Responsive breakpoint configs.
-   */
-  breakpoints?: GridLayoutBreakpoint[];
-}
-
-export interface GridLayoutBreakpoint {
-  /**
-   * Breakpoint key for reference in callbacks etc.
-   */
-  key: string;
-
-  /**
-   * Container width from which this break point should apply.
-   */
-  minWidth: number;
-
-  // Overrides for this breakpoint, see above.
-  columns?: number;
-  rowHeight?: number;
-  gap?: number;
-  columnGap?: number;
-  rowGap?: number;
-}
+// Set selection change callback (there can only be one).
+gridLayout.onSelectionChange((selection) => {
+  // Handle selection change.
+});
 ```
 
 ## Notes
 
-Set the `content` class on content elements inside items. This disables item
-selection and dragging when clicking/tapping these elements, but enables text
-selection and other regular manipulation.
+- Do not modify layout arrays or items in-place (always make copies). FGL treats
+  layouts as immutable and may cache based on object identity.
+- Set the `content` class on content elements inside items. This disables item
+  selection and dragging when clicking/tapping these elements, but enables text
+  selection and other standard browser behavior.
 
 ## TODO
 
 - Test more browser/OS combinations
-- Responsive breakpoints

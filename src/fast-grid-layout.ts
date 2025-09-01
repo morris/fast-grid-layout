@@ -1,4 +1,4 @@
-export interface GridLayoutConfigBase {
+export interface GridLayoutConfig {
   /**
    * Number of columns in the grid.
    *
@@ -35,45 +35,27 @@ export interface GridLayoutConfigBase {
    * @default gap
    */
   rowGap?: number;
-}
-
-export interface GridLayoutConfig extends GridLayoutConfigBase {
-  /**
-   * Callback triggered when the layout changes
-   * (e.g. after drag/resize or external update).
-   */
-  onLayoutChange?: (layout: GridLayoutItem[], breakpoint?: string) => void;
-
-  /**
-   * Callback triggered when the selection changes
-   * (e.g. user clicks or toggles item selection).
-   */
-  onSelectionChange?: (selection: Set<string>) => void;
-
-  /**
-   * Is the layout editable?
-   *
-   * @default true
-   */
-  editable?: boolean;
 
   /**
    * Responsive breakpoint configs.
    */
-  breakpoints?: GridLayoutBreakpoint[];
+  breakpoints?: { [name: string]: GridLayoutBreakpoint };
 }
 
-export interface GridLayoutBreakpoint extends GridLayoutConfigBase {
+export interface GridLayoutBreakpoint
+  extends Omit<GridLayoutConfig, 'breakpoints'> {
   /**
-   * Breakpoint key for reference in callbacks etc.
+   * Maximum container width for this breakpoint.
    */
-  key: string;
-
-  /**
-   * Container width from which this break point should apply.
-   */
-  minWidth: number;
+  maxWidth: number;
 }
+
+export type LayoutChangeCallback = (
+  layout: GridLayoutItem[],
+  breakpoint: string,
+) => void;
+
+export type SelectionChangeCallback = (selection: Set<string>) => void;
 
 export interface GridLayoutItem {
   i: string;
@@ -88,13 +70,32 @@ export interface GridLayoutItem {
   static?: boolean;
 }
 
+/**
+ * @protected
+ */
+export interface GridLayoutCompiledBreakpoint {
+  name: string;
+  maxWidth: number;
+  columns: number;
+  rowHeight: number;
+  columnGap: number;
+  rowGap: number;
+}
+
+/**
+ * @protected
+ */
 export type ResizeHandle = 'n' | 'e' | 's' | 'w' | 'ne' | 'se' | 'sw' | 'nw';
 
 export class GridLayout {
   protected container: HTMLElement;
-  protected config: GridLayoutConfig;
-  protected layouts = new Map<string, GridLayoutItem[]>(); // Mapped by breakpoint key.
-  protected breakpoint: GridLayoutBreakpoint = { key: '', minWidth: 0 };
+  protected containerWidth: number;
+  protected breakpoints: GridLayoutCompiledBreakpoint[];
+  protected layouts = new Map<string, GridLayoutItem[]>(); // Mapped by breakpoint name.
+
+  protected editable = false;
+  protected layoutChangeCallback: LayoutChangeCallback = () => {};
+  protected selectionChangeCallback: SelectionChangeCallback = () => {};
 
   protected selection = new Set<string>();
   protected resizeHandle?: ResizeHandle;
@@ -124,7 +125,8 @@ export class GridLayout {
 
   constructor(container: HTMLElement, config: GridLayoutConfig) {
     this.container = container;
-    this.config = config;
+    this.containerWidth = container.offsetWidth;
+    this.breakpoints = this.fn.compileBreakpoints(config);
 
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(this.container);
@@ -132,31 +134,34 @@ export class GridLayout {
     this.addEventListeners();
   }
 
-  getColumns(breakpoint?: string) {
-    return this.getBreakpoint(breakpoint).columns ?? this.config.columns ?? 12;
-  }
+  getBreakpoint(name?: string) {
+    const breakpoints = this.breakpoints;
 
-  getLayout(breakpoint?: string) {
-    return this.layouts.get(this.getBreakpoint(breakpoint).key) ?? [];
-  }
+    if (name) {
+      const breakpoint = breakpoints.find((it) => it.name === name);
 
-  getBreakpoint(breakpoint?: string) {
-    if (breakpoint) {
-      const b = this.config.breakpoints?.find((b) => b.key === breakpoint);
-
-      if (b) return b;
+      if (breakpoint) return breakpoint;
     }
 
-    return this.breakpoint;
+    return breakpoints.find(
+      (it) => it.maxWidth >= this.containerWidth,
+    ) as GridLayoutCompiledBreakpoint;
   }
 
   setConfig(config: GridLayoutConfig) {
-    if (this.config === config) return;
+    this.breakpoints = this.fn.compileBreakpoints(config);
 
-    this.config = config;
+    for (const [name, layout] of this.layouts) {
+      const breakpoint = this.getBreakpoint(name);
+      const repaired = this.fn.repairLayout(layout, breakpoint.columns);
 
-    for (const [key, layout] of this.layouts) {
-      this.layouts.set(key, this.fn.repairLayout(layout, this.getColumns()));
+      if (repaired !== layout) {
+        this.layouts.set(
+          name,
+          this.fn.repairLayout(layout, breakpoint.columns),
+        );
+        this.layoutChangeCallback(layout, breakpoint.name);
+      }
     }
 
     this.layoutFlag = true;
@@ -165,26 +170,36 @@ export class GridLayout {
     this.requestRender();
   }
 
+  setEditable(editable: boolean) {
+    this.editable = editable;
+
+    this.selectionFlag = true;
+    this.metaFlag = true;
+    this.requestRender();
+  }
+
+  onLayoutChange(callback: LayoutChangeCallback) {
+    this.layoutChangeCallback = callback;
+  }
+
+  onSelectionChange(callback: SelectionChangeCallback) {
+    this.selectionChangeCallback = callback;
+  }
+
   setLayout(layout: GridLayoutItem[], breakpoint?: string) {
-    const key = breakpoint ?? this.breakpoint.key;
-    const before = this.layouts.get(key);
+    const b = this.getBreakpoint(breakpoint);
+    const before = this.layouts.get(b.name);
 
     if (layout === before) return;
 
-    this.layouts.set(key, this.fn.repairLayout(layout, this.getColumns(key)));
-    this.config.onLayoutChange?.(layout, key);
+    this.layouts.set(b.name, this.fn.repairLayout(layout, b.columns));
+    this.layoutChangeCallback(layout, b.name);
 
-    const breakpoints = this.config.breakpoints;
-
-    if (breakpoints) {
-      for (const breakpoint of breakpoints) {
-        if (!this.layouts.has(breakpoint.key)) {
-          this.layouts.set(
-            breakpoint.key,
-            this.fn.repairLayout(layout, this.getColumns(breakpoint.key)),
-          );
-          this.config.onLayoutChange?.(layout, breakpoint.key);
-        }
+    // Auto-generate missing layouts.
+    for (const b2 of this.breakpoints) {
+      if (!this.layouts.has(b2.name)) {
+        this.layouts.set(b2.name, this.fn.repairLayout(layout, b2.columns));
+        this.layoutChangeCallback(layout, b2.name);
       }
     }
 
@@ -192,11 +207,11 @@ export class GridLayout {
     this.requestRender();
   }
 
-  setSelection(selection: Iterable<string>) {
-    if (selection === this.selection) return;
+  setSelection(selection: Set<string>) {
+    if (setsAreEqual(selection, this.selection)) return;
 
-    this.selection = new Set(selection);
-    this.config.onSelectionChange?.(this.selection);
+    this.selection = selection;
+    this.selectionChangeCallback(this.selection);
 
     this.selectionFlag = true;
     this.requestRender();
@@ -213,6 +228,8 @@ export class GridLayout {
       this.selection.add(key);
     }
 
+    this.selectionChangeCallback(this.selection);
+
     this.selectionFlag = true;
     this.requestRender();
   }
@@ -220,6 +237,8 @@ export class GridLayout {
   clearSelection() {
     if (this.selection.size > 0) {
       this.selection.clear();
+      this.selectionChangeCallback(this.selection);
+
       this.selectionFlag = true;
       this.requestRender();
     }
@@ -237,99 +256,116 @@ export class GridLayout {
   render() {
     this.renderRequested = false;
 
-    const dimensions = {
-      ...this.config,
-      ...this.breakpoint,
-    };
+    const breakpoint = this.getBreakpoint();
+    const layout = this.layouts.get(breakpoint.name) ?? [];
+
+    if (this.dragging) {
+      const dragX = this.dragEndX - this.dragStartX;
+      const dragY = this.dragEndY - this.dragStartY;
+
+      const columnWidth = this.fn.getColumnWidth(
+        this.containerWidth,
+        breakpoint.columns,
+        breakpoint.columnGap,
+      );
+      const columnWidthAndGap = columnWidth + breakpoint.columnGap;
+      const rowHeightAndGap = breakpoint.rowHeight + breakpoint.rowGap;
+
+      const deltaX = round(dragX / columnWidthAndGap);
+      const deltaY = round(dragY / rowHeightAndGap);
+
+      if (deltaX !== this.lastDeltaX || deltaY !== this.lastDeltaY) {
+        this.lastDeltaX = deltaX;
+        this.lastDeltaY = deltaY;
+
+        if (this.resizeHandle) {
+          this.tempLayout = this.fn.resizeItems(
+            layout,
+            breakpoint.columns,
+            this.selection,
+            deltaX,
+            deltaY,
+            this.resizeHandle,
+          );
+        } else {
+          this.tempLayout = this.fn.moveItems(
+            layout,
+            breakpoint.columns,
+            this.selection,
+            deltaX,
+            deltaY,
+          );
+        }
+
+        this.layoutFlag = true;
+      }
+    }
 
     if (this.layoutFlag) {
       this.fn.renderLayout(
         this.container,
-        this.tempLayout ?? this.getLayout(),
-        dimensions,
+        this.tempLayout ?? layout,
+        breakpoint,
       );
       this.layoutFlag = false;
     }
 
     if (this.selectionFlag) {
-      this.fn.renderSelection(this.container, this.selection);
+      this.renderSelection();
       this.selectionFlag = false;
     }
 
     if (this.metaFlag) {
-      this.fn.renderMeta(this.container, this.dragging, this.resizeHandle);
-
-      if (this.dragging) {
-        const { dx, dy } = this.fn.calculateDrag(
-          this.container,
-          dimensions,
-          this.dragStartX,
-          this.dragStartY,
-          this.dragEndX,
-          this.dragEndY,
-        );
-
-        if (dx !== this.lastDeltaX || dy !== this.lastDeltaY) {
-          this.lastDeltaX = dx;
-          this.lastDeltaY = dy;
-
-          if (this.resizeHandle) {
-            this.tempLayout = this.fn.resizeItems(
-              this.getLayout(),
-              this.getColumns(),
-              this.selection,
-              dx,
-              dy,
-              this.resizeHandle,
-            );
-          } else {
-            this.tempLayout = this.fn.moveItems(
-              this.getLayout(),
-              this.getColumns(),
-              this.selection,
-              dx,
-              dy,
-            );
-          }
-
-          this.layoutFlag = true;
-        }
-      }
-
+      this.renderMeta();
       this.metaFlag = false;
+    }
+  }
+
+  protected renderSelection() {
+    const children = this.container.children;
+
+    for (let i = 0, l = children.length; i < l; ++i) {
+      const element = children[i];
+
+      if (element instanceof HTMLElement) {
+        element.classList.toggle(
+          '-selected',
+          this.selection.has(element.dataset.key as string),
+        );
+      }
+    }
+  }
+
+  protected renderMeta() {
+    const { container, editable, dragging, resizeHandle } = this;
+
+    container.classList.toggle('-editable', editable);
+    container.classList.toggle('-moving', dragging && !resizeHandle);
+    container.classList.toggle('-resizing', dragging && !!resizeHandle);
+
+    const root = container.ownerDocument.documentElement;
+
+    root.classList.toggle('_hide-selection', dragging);
+    root.classList.toggle('_force-cursor', !!resizeHandle);
+
+    const cursor = this.fn.getResizeCursor(resizeHandle);
+
+    if (root.style.getPropertyValue('--force-cursor') !== cursor) {
+      root.style.setProperty('--force-cursor', cursor);
     }
   }
 
   //
 
   protected handleResize() {
-    const breakpoints = this.config.breakpoints;
-
-    if (breakpoints && breakpoints.length > 0) {
-      const containerWidth = this.container.offsetWidth;
-      let next: GridLayoutBreakpoint | undefined;
-
-      for (const candidate of breakpoints) {
-        if (
-          !next ||
-          (candidate.minWidth <= containerWidth &&
-            candidate.minWidth > next.minWidth)
-        ) {
-          next = candidate;
-        }
-      }
-
-      this.breakpoint = next as GridLayoutBreakpoint;
-    }
-
-    console.log(this.breakpoint);
+    this.containerWidth = this.container.offsetWidth;
 
     this.layoutFlag = true;
     this.requestRender();
   }
 
   protected handleMouseDown(e: PointerEvent) {
-    if (this.config.editable === false) return;
+    if (this.editable === false) return;
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
 
     this.dragStartTime = Date.now();
@@ -345,7 +381,7 @@ export class GridLayout {
   }
 
   protected handleMouseMove(e: PointerEvent) {
-    if (this.config.editable === false) return;
+    if (this.editable === false) return;
     if (e.pointerType !== 'mouse') return;
 
     this.dragEndX = e.pageX;
@@ -370,13 +406,13 @@ export class GridLayout {
       this.dragging = true;
 
       if (!this.selection.has(this.dragKey) || this.resizeHandle) {
-        this.setSelection([this.dragKey]);
+        this.setSelection(new Set(this.dragKey));
       }
     }
   }
 
   protected handleMouseUp(e: PointerEvent) {
-    if (this.config.editable === false) return;
+    if (this.editable === false) return;
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
 
     if (this.tempLayout) {
@@ -388,7 +424,7 @@ export class GridLayout {
   }
 
   protected handlePointerDown(e: PointerEvent) {
-    if (this.config.editable === false) return;
+    if (this.editable === false) return;
     if (e.pointerType === 'mouse') return;
     if (this.dragPointerId) return;
 
@@ -408,7 +444,7 @@ export class GridLayout {
   }
 
   protected handlePointerMove(e: PointerEvent) {
-    if (this.config.editable === false) return;
+    if (this.editable === false) return;
     if (e.pointerType === 'mouse') return;
     if (e.pointerId !== this.dragPointerId) return;
 
@@ -420,7 +456,7 @@ export class GridLayout {
   }
 
   protected handlePointerUp(e: PointerEvent) {
-    if (this.config.editable === false) return;
+    if (this.editable === false) return;
     if (e.pointerType === 'mouse') return;
     if (e.pointerId !== this.dragPointerId) return;
 
@@ -446,6 +482,8 @@ export class GridLayout {
   }
 
   protected handleClick(e: MouseEvent) {
+    if (this.editable === false) return;
+
     if (this.preventClick) {
       this.preventClick = false;
 
@@ -465,7 +503,7 @@ export class GridLayout {
   }
 
   protected handleKeyUp(e: KeyboardEvent) {
-    if (this.config.editable === false) return;
+    if (this.editable === false) return;
 
     switch (e.key) {
       case 'Escape':
@@ -542,9 +580,10 @@ export class GridLayout {
   //
 
   disconnect() {
+    this.selection = new Set();
     this.resetDrag();
-    this.fn.renderSelection(this.container, new Set());
-    this.fn.renderMeta(this.container, false);
+    this.renderSelection();
+    this.renderMeta();
 
     this.resizeObserver.unobserve(this.container);
     this.removeEventListeners();
@@ -593,30 +632,52 @@ export class GridLayout {
 
   //
 
-  static DEFAULT_COLUMNS = 12;
-  static DEFAULT_ROW_HEIGHT = 30;
-  static DEFAULT_GAP = 0;
-
   static RESIZE_THRESHOLD = 10;
   static TAP_DELAY = 250;
   static TAP_THRESHOLD = 10;
   static DRAG_THRESHOLD = 7;
 
+  static compileBreakpoints(
+    config: GridLayoutConfig,
+  ): GridLayoutCompiledBreakpoint[] {
+    const defaultColumns = 12;
+    const defaultRowHeight = 30;
+
+    const breakpoints = Object.entries(config.breakpoints ?? {})
+      .map(([name, b]) => {
+        return {
+          name,
+          maxWidth: b.maxWidth,
+          columns: b.columns ?? config.columns ?? defaultColumns,
+          rowHeight: b.rowHeight ?? config.rowHeight ?? defaultRowHeight,
+          rowGap: b.rowGap ?? b.gap ?? config.rowGap ?? config.gap ?? 0,
+          columnGap:
+            b.columnGap ?? b.gap ?? config.columnGap ?? config.gap ?? 0,
+        };
+      })
+      .sort((a, b) => a.maxWidth - b.maxWidth);
+
+    breakpoints.push({
+      name: 'default',
+      maxWidth: Infinity,
+      columns: config.columns ?? defaultColumns,
+      rowHeight: config.rowHeight ?? defaultRowHeight,
+      rowGap: config.rowGap ?? config.gap ?? 0,
+      columnGap: config.columnGap ?? config.gap ?? 0,
+    });
+
+    return breakpoints;
+  }
+
   static renderLayout(
     container: HTMLElement,
     layout: GridLayoutItem[],
-    config: GridLayoutConfigBase,
+    config: GridLayoutCompiledBreakpoint,
   ) {
-    const {
-      columns = this.DEFAULT_COLUMNS,
-      gap = this.DEFAULT_GAP,
-      columnGap = gap,
-      rowGap = gap,
-      rowHeight = this.DEFAULT_ROW_HEIGHT,
-    } = config;
+    const { columns, columnGap, rowGap, rowHeight } = config;
 
     const containerWidth = container.offsetWidth;
-    const columnWidth = (containerWidth - (columns - 1) * columnGap) / columns;
+    const columnWidth = this.getColumnWidth(containerWidth, columns, columnGap);
     const columnWidthAndGap = columnWidth + columnGap;
     const rowHeightAndGap = rowHeight + rowGap;
 
@@ -690,61 +751,12 @@ export class GridLayout {
     }
   }
 
-  static renderSelection(container: HTMLElement, selection: Set<string>) {
-    for (let i = 0, l = container.children.length; i < l; ++i) {
-      const element = container.children[i];
-
-      if (element instanceof HTMLElement) {
-        element.classList.toggle(
-          '-selected',
-          selection.has(element.dataset.key as string),
-        );
-      }
-    }
-  }
-
-  static renderMeta(
-    container: HTMLElement,
-    dragging: boolean,
-    resizeHandle?: ResizeHandle,
+  static getColumnWidth(
+    containerWidth: number,
+    columns: number,
+    columnGap: number,
   ) {
-    container.classList.toggle('-moving', dragging && !resizeHandle);
-    container.classList.toggle('-resizing', dragging && !!resizeHandle);
-
-    const root = container.ownerDocument.documentElement;
-
-    root.classList.toggle('_hide-selection', dragging);
-    root.classList.toggle('_force-cursor', !!resizeHandle);
-
-    const cursor = this.getResizeCursor(resizeHandle);
-
-    if (root.style.getPropertyValue('--force-cursor') !== cursor) {
-      root.style.setProperty('--force-cursor', cursor);
-    }
-  }
-
-  static calculateDrag(
-    container: HTMLElement,
-    config: GridLayoutConfigBase,
-    dragStartX: number,
-    dragStartY: number,
-    dragEndX: number,
-    dragEndY: number,
-  ) {
-    const {
-      columns = this.DEFAULT_COLUMNS,
-      rowHeight = this.DEFAULT_ROW_HEIGHT,
-      gap = this.DEFAULT_GAP,
-      columnGap = gap,
-      rowGap = gap,
-    } = config;
-
-    const containerWidth = container.offsetWidth;
-    const columnWidth = (containerWidth - (columns - 1) * columnGap) / columns;
-    const dx = round((dragEndX - dragStartX) / (columnWidth + columnGap));
-    const dy = round((dragEndY - dragStartY) / (rowHeight + rowGap));
-
-    return { dx, dy };
+    return (containerWidth - (columns - 1) * columnGap) / columns;
   }
 
   static checkResizeHandle(
@@ -810,10 +822,10 @@ export class GridLayout {
     layout: GridLayoutItem[],
     columns: number,
     selection: Set<string>,
-    dx: number,
-    dy: number,
+    deltaX: number,
+    deltaY: number,
   ) {
-    if ((dx === 0 && dy === 0) || selection.size === 0) {
+    if ((deltaX === 0 && deltaY === 0) || selection.size === 0) {
       return layout;
     }
 
@@ -823,8 +835,8 @@ export class GridLayout {
       const item = layout[i];
 
       if (selection.has(item.i)) {
-        const x = item.x + dx;
-        const y = item.y + dy;
+        const x = item.x + deltaX;
+        const y = item.y + deltaY;
 
         if (item.x !== x || item.y !== y) {
           if (out === layout) {
@@ -837,9 +849,7 @@ export class GridLayout {
       }
     }
 
-    if (out === layout) {
-      return layout;
-    }
+    if (out === layout) return layout;
 
     return this.repairLayout(out, columns, selection);
   }
@@ -852,11 +862,11 @@ export class GridLayout {
     layout: GridLayoutItem[],
     columns: number,
     selection: Set<string>,
-    dx: number,
-    dy: number,
+    deltaX: number,
+    deltaY: number,
     handle: ResizeHandle,
   ) {
-    if (dx === 0 && dy === 0) {
+    if ((deltaX === 0 && deltaY === 0) || selection.size === 0) {
       return layout;
     }
 
@@ -874,38 +884,38 @@ export class GridLayout {
 
         switch (handle) {
           case 'n':
-            h = clamp(h - dy, 1, maxH);
-            y = clamp(y + dy, 0, yh - 1);
+            h = clamp(h - deltaY, 1, maxH);
+            y = clamp(y + deltaY, 0, yh - 1);
             break;
           case 'e':
-            w = clamp(w + dx, 1, min(maxW, cx));
+            w = clamp(w + deltaX, 1, min(maxW, cx));
             break;
           case 's':
-            h = clamp(h + dy, 1, maxH);
+            h = clamp(h + deltaY, 1, maxH);
             break;
           case 'w':
-            w = clamp(w - dx, 1, min(maxW, xw));
-            x = clamp(x + dx, 0, xw - 1);
+            w = clamp(w - deltaX, 1, min(maxW, xw));
+            x = clamp(x + deltaX, 0, xw - 1);
             break;
           case 'ne':
-            w = clamp(w + dx, 1, min(maxW, cx));
-            h = clamp(h - dy, 1, maxH);
-            y = clamp(y + dy, 0, yh - 1);
+            w = clamp(w + deltaX, 1, min(maxW, cx));
+            h = clamp(h - deltaY, 1, maxH);
+            y = clamp(y + deltaY, 0, yh - 1);
             break;
           case 'se':
-            w = clamp(w + dx, 1, min(maxW, cx));
-            h = clamp(h + dy, 1, maxH);
+            w = clamp(w + deltaX, 1, min(maxW, cx));
+            h = clamp(h + deltaY, 1, maxH);
             break;
           case 'sw':
-            w = clamp(w - dx, 1, min(maxW, xw));
-            h = clamp(h + dy, 1, maxH);
-            x = clamp(x + dx, 0, xw - 1);
+            w = clamp(w - deltaX, 1, min(maxW, xw));
+            h = clamp(h + deltaY, 1, maxH);
+            x = clamp(x + deltaX, 0, xw - 1);
             break;
           case 'nw':
-            w = clamp(w - dx, 1, min(maxW, xw));
-            h = clamp(h - dy, 1, maxH);
-            x = clamp(x + dx, 0, xw - 1);
-            y = clamp(y + dy, 0, yh - 1);
+            w = clamp(w - deltaX, 1, min(maxW, xw));
+            h = clamp(h - deltaY, 1, maxH);
+            x = clamp(x + deltaX, 0, xw - 1);
+            y = clamp(y + deltaY, 0, yh - 1);
             break;
         }
 
@@ -920,6 +930,8 @@ export class GridLayout {
       }
     }
 
+    if (out === layout) return layout;
+
     return this.repairLayout(out, columns, selection);
   }
 
@@ -933,6 +945,7 @@ export class GridLayout {
     selection?: Set<string>,
   ) {
     // Sort by row first, selection second (if any), column third.
+    // TODO Considering overlap when selected might yield even better behavior?
     const sortedItems = layout.slice(0).sort((a, b) => {
       if (a.y < b.y) return -1;
       if (a.y > b.y) return 1;
@@ -1059,6 +1072,17 @@ export class GridLayout {
 
     return { ...item, x, y, w, h };
   }
+}
+
+function setsAreEqual<T>(a: Set<T>, b: Set<T>) {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+
+  for (const a_ of a) {
+    if (!b.has(a_)) return false;
+  }
+
+  return true;
 }
 
 function clamp(value: number, min: number, max: number) {

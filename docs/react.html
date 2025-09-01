@@ -75,6 +75,7 @@
               <GridLayout
                 config={config}
                 layout={layout}
+                editable
                 onLayoutChange={setLayout}
               >
                 {layout.map((item, i) => (
@@ -93,7 +94,13 @@
         );
       }
 
-      function GridLayout({ config, layout, onLayoutChange, children }) {
+      function GridLayout({
+        config,
+        layout,
+        editable,
+        onLayoutChange,
+        children,
+      }) {
         const containerRef = React.useRef(null);
         const controllerRef = React.useRef(null);
 
@@ -111,9 +118,11 @@
 
           if (!controller) return;
 
-          controller.setConfig({ ...config, onLayoutChange });
+          controller.setConfig(config);
           controller.setLayout(layout);
-        }, [config, layout, onLayoutChange, children]);
+          controller.setEditable(editable);
+          controller.onLayoutChange(onLayoutChange);
+        }, [config, layout, editable, onLayoutChange, children]);
 
         return <div ref={containerRef}>{children}</div>;
       }

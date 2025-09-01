@@ -58,9 +58,11 @@
         columns,
         rowHeight: 40,
         gap: 10,
-        onLayoutChange(l) {
-          layout = l;
-        },
+      });
+
+      gridLayout.setEditable(true);
+      gridLayout.onLayoutChange((l) => {
+        layout = l;
       });
 
       regenerate();

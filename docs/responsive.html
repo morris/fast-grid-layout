@@ -69,18 +69,22 @@
       });
 
       const gridLayout = new GridLayout(container, {
+        columns: 12,
         rowHeight: 40,
-        breakpoints: [
-          { key: 'sm', minWidth: 0, columns: 4, gap: 5 },
-          { key: 'md', minWidth: 640, columns: 8, gap: 10 },
-          { key: 'lg', minWidth: 1024, columns: 12, gap: 10 },
-        ],
-        onLayoutChange(layout, breakpoint) {
-          console.log(`Layout changed for breakpoint ${breakpoint}`);
+        gap: 10,
+        breakpoints: {
+          sm: { maxWidth: 640, columns: 4, gap: 5, rowHeight: 30 },
+          md: { maxWidth: 1024, columns: 8, gap: 10 },
         },
       });
 
-      gridLayout.setLayout(generateDemoLayout(items.length, 12, true), 'lg');
+      gridLayout.setEditable(true);
+
+      gridLayout.onLayoutChange((layout, breakpoint) => {
+        console.log(`Layout changed for breakpoint ${breakpoint}`);
+      });
+
+      gridLayout.setLayout(generateDemoLayout(items.length, 12, true));
     </script>
   </body>
 </html>

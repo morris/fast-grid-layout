@@ -16,10 +16,6 @@
       transform 0.18s ease,
       outline 0.1s ease-out;
 
-    &.-dynamic {
-      cursor: pointer;
-    }
-
     &.-selected {
       outline: var(--fast-grid-layout-outline);
       z-index: 1;
@@ -35,6 +31,10 @@
     .content {
       cursor: auto;
     }
+  }
+
+  &.-editable > .item.-dynamic {
+    cursor: pointer;
   }
 
   &.-moving,
