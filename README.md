@@ -132,7 +132,7 @@ function App() {
 
   return (
     <div>
-      <h1>Fast Grid Layout (React)</h1>
+      <h1>Fast Grid Layout</h1>
       <GridLayout config={config} layout={layout} editable>
         {layout.map((item) => (
           <div key={item.i} data-key={item.i}>
@@ -170,7 +170,7 @@ const gridLayout = new GridLayout(container, {
 // Set config dynamically.
 gridLayout.setConfig({ /* See above. */ });
 
-// Toggle editing (default: off)
+// Toggle editing (default: off).
 gridLayout.setEditable(true);
 
 // Set layout change callback (there can only be one).
@@ -187,7 +187,7 @@ gridLayout.onSelectionChange((selection) => {
 
 ## Performance
 
-FGL's scripting overhead is negligible, so performance is only limited by the
+FGL's scripting overhead is negligible, so performance is usually limited by the
 work the browser needs to do (animations in particular). For example, here's a
 profile of 4 seconds of dragging 1 item in a 1000 item layout with FGL:
 
@@ -218,3 +218,4 @@ Issues and PRs welcome!
 - Test more browser/OS combinations
 - Describe/streamline server-side rendering
 - Document CSS classes
+- Write (more) tests

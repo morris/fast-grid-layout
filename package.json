@@ -33,6 +33,7 @@
     "lint": "eslint .",
     "test": "bash scripts/test.sh --project Chromium",
     "test-coverage": "bash scripts/test-coverage.sh --project Chromium",
+    "test-e2e": "bash scripts/test.sh",
     "test-ui": "playwright test --ui"
   },
   "devDependencies": {
