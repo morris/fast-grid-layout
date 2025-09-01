@@ -4,12 +4,15 @@ Fast editable grid layout system similar to
 [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
 Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 
+<img src="./docs/assets/demo.webp" width="640">
+
 - Multi-item drag and drop
 - Robust, deterministic manipulation (less accidents)
 - Touch support (tap to select, then manipulate)
 - Responsive breakpoints with auto-generation
 - Data format compatible with
   [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
+- 4 KB (minimized & gzipped)
 
 Try the **[Demo (Vanilla)](https://morris.github.io/fast-grid-layout/) |
 [Demo (with Breakpoints)](https://morris.github.io/fast-grid-layout/react.html)
