@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Fast Grid Layout: Responsive Breakpoints</title>
+    <meta
+      name="description"
+      content="Fast editable grid layout system similar to React Grid Layout. Performant even at hundreds of items. Vanilla/framework-agnostic."
+    />
+
+    <link rel="stylesheet" href="./css/fast-grid-layout.css" />
+    <link rel="stylesheet" href="./css/demo.css" />
+  </head>
+  <body>
+    <div class="demo-column">
+      <h1>Fast Grid Layout: Responsive Breakpoints</h1>
+
+      <nav>
+        <p>
+          Demos:
+          <a href=".">Vanilla</a> | <strong>Responsive Breakpoints</strong> |
+          <a href="./react.html">React</a>
+        </p>
+      </nav>
+
+      <p>
+        Resizing the viewport will switch between 3 different breakpoints with
+        individual layouts.
+      </p>
+
+      <div class="demo-container -responsive">
+        <div class="fast-grid-layout"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { GridLayout } from './js/fast-grid-layout.js';
+      import { generateDemoLayout } from './js/demo.js';
+      import { reconcile } from 'https://cdn.jsdelivr.net/npm/exdom@2/dist/exdom.min.js';
+
+      const container = document.querySelector('.fast-grid-layout');
+
+      const items = [];
+
+      for (let i = 0; i < 50; ++i) items.push(i.toString());
+
+      reconcile({
+        container,
+        items,
+        create(item) {
+          const i = parseInt(item);
+          const element = document.createElement('div');
+          element.dataset.key = item;
+          element.className = `demo-item -style${(i % 16) + 1}`;
+          element.innerHTML = `<h2>${i + 101}</h2>`;
+
+          if (i % 5 === 3) {
+            element.innerHTML += '<p class="content">Example content</p>';
+          }
+
+          if (item.static) {
+            element.innerHTML += '<p class="content">(Static item)</p>';
+          }
+
+          return element;
+        },
+      });
+
+      const gridLayout = new GridLayout(container, {
+        rowHeight: 40,
+        breakpoints: [
+          { key: 'sm', minWidth: 0, columns: 4, gap: 5 },
+          { key: 'md', minWidth: 640, columns: 8, gap: 10 },
+          { key: 'lg', minWidth: 1024, columns: 12, gap: 10 },
+        ],
+        onLayoutChange(layout, breakpoint) {
+          console.log(`Layout changed for breakpoint ${breakpoint}`);
+        },
+      });
+
+      gridLayout.setLayout(generateDemoLayout(items.length, 12, true), 'lg');
+    </script>
+  </body>
+</html>

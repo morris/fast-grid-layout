@@ -1,4 +1,4 @@
-export interface GridLayoutConfig {
+export interface GridLayoutConfigBase {
   /**
    * Number of columns in the grid.
    *
@@ -35,12 +35,14 @@ export interface GridLayoutConfig {
    * @default gap
    */
   rowGap?: number;
+}
 
+export interface GridLayoutConfig extends GridLayoutConfigBase {
   /**
    * Callback triggered when the layout changes
    * (e.g. after drag/resize or external update).
    */
-  onLayoutChange?: (layout: GridLayoutItem[]) => void;
+  onLayoutChange?: (layout: GridLayoutItem[], breakpoint?: string) => void;
 
   /**
    * Callback triggered when the selection changes
@@ -54,6 +56,23 @@ export interface GridLayoutConfig {
    * @default true
    */
   editable?: boolean;
+
+  /**
+   * Responsive breakpoint configs.
+   */
+  breakpoints?: GridLayoutBreakpoint[];
+}
+
+export interface GridLayoutBreakpoint extends GridLayoutConfigBase {
+  /**
+   * Breakpoint key for reference in callbacks etc.
+   */
+  key: string;
+
+  /**
+   * Container width from which this break point should apply.
+   */
+  minWidth: number;
 }
 
 export interface GridLayoutItem {
@@ -74,12 +93,12 @@ export type ResizeHandle = 'n' | 'e' | 's' | 'w' | 'ne' | 'se' | 'sw' | 'nw';
 export class GridLayout {
   protected container: HTMLElement;
   protected config: GridLayoutConfig;
-  protected columns: number;
-  protected layout: GridLayoutItem[] = [];
-  protected tempLayout?: GridLayoutItem[];
+  protected layouts = new Map<string, GridLayoutItem[]>(); // Mapped by breakpoint key.
+  protected breakpoint: GridLayoutBreakpoint = { key: '', minWidth: 0 };
 
   protected selection = new Set<string>();
   protected resizeHandle?: ResizeHandle;
+  protected tempLayout?: GridLayoutItem[];
 
   protected dragPointerId = 0;
   protected dragStartTime = 0;
@@ -106,34 +125,68 @@ export class GridLayout {
   constructor(container: HTMLElement, config: GridLayoutConfig) {
     this.container = container;
     this.config = config;
-    this.columns = config.columns ?? 12;
 
-    this.resizeObserver = new ResizeObserver(() => {
-      this.layoutFlag = true;
-      this.requestRender();
-    });
+    this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(this.container);
 
     this.addEventListeners();
+  }
+
+  getColumns(breakpoint?: string) {
+    return this.getBreakpoint(breakpoint).columns ?? this.config.columns ?? 12;
+  }
+
+  getLayout(breakpoint?: string) {
+    return this.layouts.get(this.getBreakpoint(breakpoint).key) ?? [];
+  }
+
+  getBreakpoint(breakpoint?: string) {
+    if (breakpoint) {
+      const b = this.config.breakpoints?.find((b) => b.key === breakpoint);
+
+      if (b) return b;
+    }
+
+    return this.breakpoint;
   }
 
   setConfig(config: GridLayoutConfig) {
     if (this.config === config) return;
 
     this.config = config;
-    this.columns = config.columns ?? 12;
-    this.layout = this.fn.repairLayout(this.layout, this.columns);
+
+    for (const [key, layout] of this.layouts) {
+      this.layouts.set(key, this.fn.repairLayout(layout, this.getColumns()));
+    }
+
     this.layoutFlag = true;
     this.selectionFlag = true;
     this.metaFlag = true;
     this.requestRender();
   }
 
-  setLayout(layout: GridLayoutItem[]) {
-    if (this.layout === layout) return;
+  setLayout(layout: GridLayoutItem[], breakpoint?: string) {
+    const key = breakpoint ?? this.breakpoint.key;
+    const before = this.layouts.get(key);
 
-    this.layout = this.fn.repairLayout(layout, this.columns);
-    this.config.onLayoutChange?.(this.layout);
+    if (layout === before) return;
+
+    this.layouts.set(key, this.fn.repairLayout(layout, this.getColumns(key)));
+    this.config.onLayoutChange?.(layout, key);
+
+    const breakpoints = this.config.breakpoints;
+
+    if (breakpoints) {
+      for (const breakpoint of breakpoints) {
+        if (!this.layouts.has(breakpoint.key)) {
+          this.layouts.set(
+            breakpoint.key,
+            this.fn.repairLayout(layout, this.getColumns(breakpoint.key)),
+          );
+          this.config.onLayoutChange?.(layout, breakpoint.key);
+        }
+      }
+    }
 
     this.layoutFlag = true;
     this.requestRender();
@@ -184,11 +237,16 @@ export class GridLayout {
   render() {
     this.renderRequested = false;
 
+    const dimensions = {
+      ...this.config,
+      ...this.breakpoint,
+    };
+
     if (this.layoutFlag) {
       this.fn.renderLayout(
         this.container,
-        this.tempLayout ?? this.layout,
-        this.config,
+        this.tempLayout ?? this.getLayout(),
+        dimensions,
       );
       this.layoutFlag = false;
     }
@@ -204,7 +262,7 @@ export class GridLayout {
       if (this.dragging) {
         const { dx, dy } = this.fn.calculateDrag(
           this.container,
-          this.config,
+          dimensions,
           this.dragStartX,
           this.dragStartY,
           this.dragEndX,
@@ -217,8 +275,8 @@ export class GridLayout {
 
           if (this.resizeHandle) {
             this.tempLayout = this.fn.resizeItems(
-              this.layout,
-              this.columns,
+              this.getLayout(),
+              this.getColumns(),
               this.selection,
               dx,
               dy,
@@ -226,8 +284,8 @@ export class GridLayout {
             );
           } else {
             this.tempLayout = this.fn.moveItems(
-              this.layout,
-              this.columns,
+              this.getLayout(),
+              this.getColumns(),
               this.selection,
               dx,
               dy,
@@ -243,6 +301,32 @@ export class GridLayout {
   }
 
   //
+
+  protected handleResize() {
+    const breakpoints = this.config.breakpoints;
+
+    if (breakpoints && breakpoints.length > 0) {
+      const containerWidth = this.container.offsetWidth;
+      let next: GridLayoutBreakpoint | undefined;
+
+      for (const candidate of breakpoints) {
+        if (
+          !next ||
+          (candidate.minWidth <= containerWidth &&
+            candidate.minWidth > next.minWidth)
+        ) {
+          next = candidate;
+        }
+      }
+
+      this.breakpoint = next as GridLayoutBreakpoint;
+    }
+
+    console.log(this.breakpoint);
+
+    this.layoutFlag = true;
+    this.requestRender();
+  }
 
   protected handleMouseDown(e: PointerEvent) {
     if (this.config.editable === false) return;
@@ -521,7 +605,7 @@ export class GridLayout {
   static renderLayout(
     container: HTMLElement,
     layout: GridLayoutItem[],
-    config: GridLayoutConfig,
+    config: GridLayoutConfigBase,
   ) {
     const {
       columns = this.DEFAULT_COLUMNS,
@@ -641,7 +725,7 @@ export class GridLayout {
 
   static calculateDrag(
     container: HTMLElement,
-    config: GridLayoutConfig,
+    config: GridLayoutConfigBase,
     dragStartX: number,
     dragStartY: number,
     dragEndX: number,

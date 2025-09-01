@@ -1,4 +1,4 @@
-export function generateDemoLayout(numberOfItems, columns) {
+export function generateDemoLayout(numberOfItems, columns, noStatics) {
   const layout = [];
 
   let r = 0;
@@ -12,7 +12,14 @@ export function generateDemoLayout(numberOfItems, columns) {
     );
     const h = Math.floor((Math.random() * columns) / 2) + 3;
 
-    layout.push({ x, y, w, h, i: i.toString(), static: i % 7 === 6 });
+    layout.push({
+      x,
+      y,
+      w,
+      h,
+      i: i.toString(),
+      static: noStatics ? false : i % 9 === 6,
+    });
 
     x = x + w;
 

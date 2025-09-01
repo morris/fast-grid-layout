@@ -196,6 +196,30 @@ export interface GridLayoutConfig {
    * @default true
    */
   editable?: boolean;
+
+  /**
+   * Responsive breakpoint configs.
+   */
+  breakpoints?: GridLayoutBreakpoint[];
+}
+
+export interface GridLayoutBreakpoint {
+  /**
+   * Breakpoint key for reference in callbacks etc.
+   */
+  key: string;
+
+  /**
+   * Container width from which this break point should apply.
+   */
+  minWidth: number;
+
+  // Overrides for this breakpoint, see above.
+  columns?: number;
+  rowHeight?: number;
+  gap?: number;
+  columnGap?: number;
+  rowGap?: number;
 }
 ```
 
