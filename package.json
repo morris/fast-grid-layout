@@ -1,7 +1,7 @@
 {
   "name": "fast-grid-layout",
   "version": "0.1.0",
-  "description": "Essential DOM utilities",
+  "description": "Fast editable grid layout system similar to React Grid Layout",
   "keywords": [
     "react",
     "grid",
@@ -27,7 +27,6 @@
     "build": "bash scripts/build.sh",
     "clean": "rm -rf coverage dist test-results",
     "dev": "bash scripts/dev.sh",
-    "docs": "typedoc src/fast-grid-layout.ts --excludeProtected --excludePrivate",
     "format": "prettier --write .",
     "format-check": "prettier --check .",
     "lint": "eslint .",

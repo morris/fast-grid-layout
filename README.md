@@ -15,7 +15,7 @@ Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 - 4 KB (minimized & gzipped)
 
 Try the **[Demo (Vanilla)](https://morris.github.io/fast-grid-layout/) |
-[Demo (with Breakpoints)](https://morris.github.io/fast-grid-layout/react.html)
+[Demo (with Breakpoints)](https://morris.github.io/fast-grid-layout/responsive.html)
 | [Demo (React)](https://morris.github.io/fast-grid-layout/react.html)**
 
 ## Installation
