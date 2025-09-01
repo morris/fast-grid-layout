@@ -185,6 +185,19 @@ gridLayout.onSelectionChange((selection) => {
 });
 ```
 
+## Performance
+
+FGL's scripting overhead is negligible, so performance is only limited by the
+work the browser needs to do (animations in particular). For example, here's a
+profile of 4 seconds of dragging 1 item in a 1000 item layout with FGL:
+
+<img src="./docs/assets/fgl-profile.png" width="640">
+
+For comparison, here's a profile of 4 seconds of dragging 1 item in a 1000 item
+layout with RGL (scripting overhead is blocking the main thread entirely):
+
+<img src="./docs/assets/rgl-profile.png" width="640">
+
 ## Notes
 
 - Do not modify layout arrays or items in-place (always make copies). FGL treats
@@ -192,8 +205,16 @@ gridLayout.onSelectionChange((selection) => {
 - Set the `content` class on content elements inside items. This disables item
   selection and dragging when clicking/tapping these elements, but enables text
   selection and other standard browser behavior.
+- You may further customize FGL by extending the `GridLayout` class and
+  overriding methods and static functions. However, only the public interface of
+  `GridLayout` should be considered stable (semantic versioning).
+
+## Contributing
+
+Issues and PRs welcome!
 
 ## TODO
 
 - Test more browser/OS combinations
 - Describe/streamline server-side rendering
+- Document CSS classes
