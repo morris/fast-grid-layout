@@ -47,7 +47,12 @@ Include, copy, and/or customize the [CSS](./dist/fast-grid-layout.css) |
 ### Vanilla
 
 ```html
-<div id="#layout">
+<link
+  href="https://cdn.jsdelivr.net/npm/fast-grid-layout@0.1/dist/fast-grid-layout.min.css"
+  rel="stylesheet"
+/>
+
+<div id="layout">
   <div data-key="a">A</div>
   <div data-key="b">B</div>
   <div data-key="c">C</div>
