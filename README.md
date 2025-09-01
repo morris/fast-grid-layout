@@ -7,6 +7,7 @@ Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 - Multi-item drag and drop
 - Robust, deterministic manipulation (less accidents)
 - Touch support (tap to select, then manipulate)
+- Responsive breakpoints with auto-generation
 - Data format compatible with
   [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
 
@@ -151,9 +152,15 @@ const gridLayout = new GridLayout(container, {
   columnGap: 0, // Horizontal gap between grid columns in pixels (default: gap).
   rowGap: 0, // Vertical gap between grid rows in pixels (default: gap).
   breakpoints: { // Named breakpoint configurations.
-    sm: { maxWidth: 640, columns: 4 }, // May override columns, rowHeight, gaps.
-    md: { maxWidth: 1024, columns: 8, },
-    // Larges breakpoint "default" is always implicitly defined (maxWidth: Infinity).
+    sm: {
+      maxWidth: 640, // Maximum container width for this breakpoint.
+      columns: 6, // Each breakpoint may override columns, gaps, etc.
+    },
+    md: {
+      maxWidth: 1024,
+      columns: 8
+    },
+    // Largest breakpoint "default" is implicitly defined (maxWidth: Infinity).
   }
 });
 
@@ -186,3 +193,4 @@ gridLayout.onSelectionChange((selection) => {
 ## TODO
 
 - Test more browser/OS combinations
+- Describe/streamline server-side rendering
