@@ -40,9 +40,8 @@ Via CDN:
 
 ## Usage
 
-Include, copy, and/or customize the [CSS](./dist/fast-grid-layout.css) |
-[SCSS](./src/fast-grid-layout.scss) |
-[minified CSS](./dist/fast-grid-layout.min.css).
+Include, copy, and/or customize the [CSS](./docs/css/fast-grid-layout.css) |
+[SCSS](./src/fast-grid-layout.scss).
 
 ### Vanilla
 
