@@ -3,11 +3,11 @@
   "compilerOptions": {
     "moduleResolution": "nodenext",
 
-    "strict": true,
+    "lib": ["DOM", "ES2017"],
     "noUnusedLocals": true,
 
     "target": "ES6",
-    "module": "NodeNext",
+    "module": "nodenext",
     "sourceMap": true,
     "declaration": true,
 

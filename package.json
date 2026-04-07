@@ -36,16 +36,16 @@
     "test-ui": "playwright test --ui"
   },
   "devDependencies": {
-    "@eslint/js": "^9.9.1",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.21.1",
     "@types/node": "^24.3.0",
-    "c8": "^10.1.2",
-    "eslint": "^9.9.1",
+    "c8": "^11.0.0",
+    "eslint": "^10.2.0",
     "prettier": "^3.3.2",
     "s4d": "^0.2.2",
     "sass": "^1.90.0",
     "terser": "^5.31.6",
-    "typescript": "^5.0.4",
+    "typescript": "^6.0.2",
     "typescript-eslint": "^8.2.0"
   }
 }
