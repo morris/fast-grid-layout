@@ -42,8 +42,10 @@ export interface GridLayoutConfig {
   breakpoints?: { [name: string]: GridLayoutBreakpoint };
 }
 
-export interface GridLayoutBreakpoint
-  extends Omit<GridLayoutConfig, 'breakpoints'> {
+export interface GridLayoutBreakpoint extends Omit<
+  GridLayoutConfig,
+  'breakpoints'
+> {
   /**
    * Maximum container width for this breakpoint.
    */
