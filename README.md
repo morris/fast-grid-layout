@@ -4,6 +4,10 @@ Fast editable grid layout system similar to
 [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout).
 Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 
+The **"rising tide" layout compaction algorithm** developed here eventually
+[made its way into React Grid Layout](https://github.com/react-grid-layout/react-grid-layout/pull/2189).
+Thanks for picking it up!
+
 <img src="./docs/assets/demo.webp" width="640">
 
 - Multi-item drag and drop
@@ -201,6 +205,12 @@ For comparison, here's a profile of 4 seconds of dragging 1 item in a 1000 item
 layout with RGL (scripting overhead is blocking the main thread entirely):
 
 <img src="./docs/assets/rgl-profile.png" width="640">
+
+Note that the "rising tide" layout compaction algorithm developed here has
+eventually made its way into React Grid Layout, see
+[#2152](https://github.com/react-grid-layout/react-grid-layout/pull/2152) and
+[#2189](https://github.com/react-grid-layout/react-grid-layout/pull/2189). The
+profiles above were recorded before.
 
 ## Notes
 
