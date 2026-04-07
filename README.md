@@ -5,7 +5,7 @@ Fast editable grid layout system similar to
 Performant even at **hundreds of items**. Vanilla/framework-agnostic.
 
 The **"rising tide" layout compaction algorithm** developed here eventually
-[made its way into React Grid Layout](https://github.com/react-grid-layout/react-grid-layout/pull/2189).
+[made its way back into React Grid Layout](https://github.com/react-grid-layout/react-grid-layout/pull/2184).
 Thanks for picking it up!
 
 <img src="./docs/assets/demo.webp" width="640">
@@ -209,8 +209,8 @@ layout with RGL (scripting overhead is blocking the main thread entirely):
 Note that the "rising tide" layout compaction algorithm developed here has
 eventually made its way into React Grid Layout, see
 [#2152](https://github.com/react-grid-layout/react-grid-layout/pull/2152) and
-[#2189](https://github.com/react-grid-layout/react-grid-layout/pull/2189). The
-profiles above were recorded before.
+[#2184](https://github.com/react-grid-layout/react-grid-layout/pull/2184). The
+profiles above were recorded before that.
 
 ## Notes
 
